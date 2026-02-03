@@ -1,6 +1,6 @@
 [project]
 name = "neko-translate"
-version = "0.0.1"
+version = "0.0.2"
 description = "MLX-based translation CLI with PDF translation support."
 license = { text = "MIT" }
 readme = "README.md"
@@ -31,6 +31,7 @@ classifiers = [
 dependencies = [
     "fast-langdetect>=1.0.0",
     "mlx-lm>=0.29.1",
+    "numba>=0.63.1",
     "pypdf>=6.6.2",
 ]
 
