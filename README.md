@@ -13,7 +13,7 @@ PDF の見開き翻訳コマンドも同梱されており、たとえば論文�
 - サーバーモードで常駐可能・起動コストを削減
 - 対話モード翻訳
 - ストリーミング出力 (対話モードはデフォルト ON )
-- PDF 見開き翻訳 - [pdf2zh_next を内部で利用](https://github.com/PDFMathTranslate-next/PDFMathTranslate-next)
+- PDF 翻訳 (見開き翻訳対応)
 
 ## インストール
 
@@ -108,15 +108,16 @@ neko-translate server status
 
 ### 5) PDF 翻訳
 
-pdf2zh_next を使って PDF を丸ごと翻訳します。翻訳は neko-translate サーバー経由です。
+PDF を丸ごと翻訳します。翻訳は neko-translate サーバー経由でできるだけ高速に行います。なお内部では[PDFMathTranslate-next](https://github.com/PDFMathTranslate-next/PDFMathTranslate-next)を利用しています。
+
 
 ```bash
 neko-translate-pdf paper.pdf
-# 見開き翻訳しない
+# 見開き翻訳しない場合
 neko-translate-pdf paper.pdf --no-dual
 ```
 
-デフォルトは `--input en --output ja` です。なお、出力ファイル/ディレクトリを指定も可能です。
+デフォルト言語は `--input en --output ja` です。なお、出力ファイル/ディレクトリを指定も可能です。
 
 ```bash
 neko-translate-pdf paper.pdf --output-pdf translated.pdf
