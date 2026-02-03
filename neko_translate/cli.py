@@ -17,6 +17,7 @@ import itertools
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
+from . import get_version
 from .translation_models import resolve_model_alias, resolve_translation_model
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
 DEFAULT_SOCKET_NAME = "neko-translate.sock"
@@ -113,6 +114,12 @@ def build_translate_parser() -> argparse.ArgumentParser:
             "(default: hotchpotch/CAT-Translate-0.8b-mlx-q4). "
             "Aliases: cat, plamo, hymt."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"neko-translate {get_version()}",
+        help="Show version and exit.",
     )
     parser.add_argument(
         "--text",
@@ -239,8 +246,14 @@ def build_server_parser() -> argparse.ArgumentParser:
         help=(
             "MLX model repo or local directory "
             "(default: hotchpotch/CAT-Translate-0.8b-mlx-q4). "
-            "Aliases: cat, plamo."
+            "Aliases: cat, plamo, hymt."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"neko-translate {get_version()}",
+        help="Show version and exit.",
     )
     parser.add_argument(
         "--socket",

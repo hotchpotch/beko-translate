@@ -1,31 +1,63 @@
 [project]
-name = "neko-translate-cli"
-version = "0.1.0"
-description = "Add your description here"
+name = "neko-translate"
+version = "0.0.1"
+description = "MLX-based translation CLI for CAT-Translate, PLaMo 2 Translate, and HY-MT."
+license = { text = "MIT" }
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.10"
+authors = [
+    { name = "Yuichi Tateno", email = "hotchpotch@gmail.com" }
+]
+maintainers = [
+    { name = "Yuichi Tateno", email = "hotchpotch@gmail.com" }
+]
+keywords = [
+    "translation",
+    "mlx",
+    "apple-silicon",
+    "cli",
+    "pdf",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "fast-langdetect>=1.0.0",
+    "mlx-lm>=0.29.1",
+    "pypdf>=6.6.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/hotchpotch/NEKO-translate"
+Repository = "https://github.com/hotchpotch/NEKO-translate"
+Documentation = "https://github.com/hotchpotch/NEKO-translate"
+Issues = "https://github.com/hotchpotch/NEKO-translate/issues"
 
 [project.scripts]
 neko-translate = "neko_translate:main"
 neko-translate-pdf = "neko_translate.pdf_cli:main"
 
 [build-system]
-requires = ["setuptools>=68.0"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["neko_translate"]
+[tool.setuptools.packages.find]
+include = ["neko_translate*"]
 
 [dependency-groups]
 dev = [
-    "fast-langdetect>=1.0.0",
-    "mlx-lm>=0.29.1",
+    "build>=1.3.0",
     "numba>=0.63.1",
-    "pypdf>=6.6.2",
     "pytest>=9.0.2",
     "ruff>=0.14.14",
-    "torch>=2.10.0",
+    "twine>=6.2.0",
     "tox>=4.34.1",
     "tox-uv>=1.29.0",
     "ty>=0.0.14",

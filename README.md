@@ -20,6 +20,12 @@ Apple Silicon + MLX で日本語/英語の翻訳を回すための小さな CLI 
 uv sync
 ```
 
+PyPI から入れる場合:
+
+```bash
+pip install neko-translate
+```
+
 ## 使い方
 
 ### 1) ワンショット翻訳
