@@ -28,6 +28,11 @@ dev = [
     "ty>=0.0.14",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: runs MLX model integration tests (requires RUN_MLX_INTEGRATION=1)",
+]
+
 [tool.tox]
 legacy_tox_ini = """
 [tox]

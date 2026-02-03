@@ -11,6 +11,7 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
   - Lint only: `uv run ruff check .`
   - Typecheck only: `uv run ty check`
   - Tests only: `uv run pytest`
+  - MLX integration tests: `RUN_MLX_INTEGRATION=1 uv run pytest -m integration`
 
 ## Key Directories
 - `cat_translate/`
@@ -20,7 +21,7 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
   - `to_mlx.py`: convert HF models to MLX (q4/q8) using `mlx_lm.convert`
   - `translate.py`: example script for HF/MLX translation
 - `tests/`
-  - basic smoke tests for CI
+  - unit + optional MLX integration tests
 - `output/`
   - local MLX model outputs (when converting locally)
 - `.venv/`, `.tox/`
