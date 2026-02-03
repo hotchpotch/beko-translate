@@ -17,7 +17,7 @@ import itertools
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-from .translation_models import resolve_translation_model
+from .translation_models import resolve_model_alias, resolve_translation_model
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
 DEFAULT_SOCKET_NAME = "neko-translate.sock"
 DEFAULT_LOG_NAME = "server.log"
@@ -26,8 +26,8 @@ SERVER_MODES = ("auto", "always", "never")
 DEFAULT_SERVER_MODE = "auto"
 DEFAULT_CONFIG_DIR = Path("~/.config/neko-translate").expanduser()
 DEFAULT_MAX_NEW_TOKENS = 4096
-DEFAULT_TEMPERATURE = 0.2
-DEFAULT_TOP_P = 0.9
+DEFAULT_TEMPERATURE = 0.0
+DEFAULT_TOP_P = 0.98
 DEFAULT_TOP_K = 0
 DEFAULT_NO_CHAT_TEMPLATE = False
 DEFAULT_NO_REPEAT_NGRAM = 4
@@ -70,7 +70,8 @@ def build_translate_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MLX_MODEL,
         help=(
             "MLX model repo or local directory "
-            "(default: hotchpotch/CAT-Translate-0.8b-mlx-q4)."
+            "(default: hotchpotch/CAT-Translate-0.8b-mlx-q4). "
+            "Aliases: cat, plamo."
         ),
     )
     parser.add_argument(
@@ -132,7 +133,8 @@ def build_translate_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--trust-remote-code",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Trust remote code when loading tokenizers.",
     )
     parser.add_argument(
@@ -187,7 +189,8 @@ def build_server_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MLX_MODEL,
         help=(
             "MLX model repo or local directory "
-            "(default: hotchpotch/CAT-Translate-0.8b-mlx-q4)."
+            "(default: hotchpotch/CAT-Translate-0.8b-mlx-q4). "
+            "Aliases: cat, plamo."
         ),
     )
     parser.add_argument(
@@ -204,7 +207,8 @@ def build_server_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--trust-remote-code",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Trust remote code when loading tokenizers.",
     )
     parser.add_argument(
@@ -913,7 +917,8 @@ def _start_server(
 
 
 def run_mlx(text: str, src_lang: str, tgt_lang: str, args: argparse.Namespace) -> str:
-    model, tokenizer, translator = _load_model(args.model, args.trust_remote_code)
+    model_name = resolve_model_alias(args.model, DEFAULT_MLX_MODEL)
+    model, tokenizer, translator = _load_model(model_name, args.trust_remote_code)
     gen_args = _resolve_generation_args(args, translator=translator)
     prompt = _build_prompt(
         translator=translator,
@@ -1129,7 +1134,7 @@ def _run_server(args: argparse.Namespace) -> int:
     os.chmod(socket_path, 0o600)
     sock.listen(SERVER_LISTEN_BACKLOG)
 
-    model_name = args.model or DEFAULT_MLX_MODEL
+    model_name = resolve_model_alias(args.model, DEFAULT_MLX_MODEL)
     defaults = _resolve_generation_args(
         args, translator=resolve_translation_model(model_name)
     )
@@ -1176,7 +1181,7 @@ def _server_start(args: argparse.Namespace) -> int:
     socket_path = resolve_socket_path(args.socket)
     log_path = resolve_log_path(args.log_file)
     state_path = resolve_state_path(None)
-    model = args.model or DEFAULT_MLX_MODEL
+    model = resolve_model_alias(args.model, DEFAULT_MLX_MODEL)
     defaults = _resolve_generation_args(
         args, translator=resolve_translation_model(model)
     )
@@ -1278,7 +1283,10 @@ def _server_stop(args: argparse.Namespace) -> int:
     state_path = resolve_state_path(None)
     defaults = {
         **_resolve_generation_args(
-            args, translator=resolve_translation_model(args.model or DEFAULT_MLX_MODEL)
+            args,
+            translator=resolve_translation_model(
+                resolve_model_alias(args.model, DEFAULT_MLX_MODEL)
+            ),
         ),
     }
     status = _get_server_status(socket_path, state_path=state_path)
@@ -1291,7 +1299,7 @@ def _server_stop(args: argparse.Namespace) -> int:
             json.dumps(
                 {
                     "status": "stopped",
-                    "model": args.model or DEFAULT_MLX_MODEL,
+                    "model": resolve_model_alias(args.model, DEFAULT_MLX_MODEL),
                     "socket": str(socket_path),
                     "log": str(log_path),
                     "message": "not running",
@@ -1410,7 +1418,7 @@ def _translate_text(
     server_mode = args.server
     socket_path = resolve_socket_path(args.socket)
     state_path = resolve_state_path(None)
-    model = args.model or DEFAULT_MLX_MODEL
+    model = resolve_model_alias(args.model, DEFAULT_MLX_MODEL)
 
     if args.stream and server_mode != "never":
         if server_mode == "always":
@@ -1423,7 +1431,8 @@ def _translate_text(
     if server_mode != "never":
         status = _get_server_status(socket_path, state_path=state_path)
         if status:
-            if args.model is not None and status.get("model") != args.model:
+            resolved_model = resolve_model_alias(args.model, DEFAULT_MLX_MODEL)
+            if args.model is not None and status.get("model") != resolved_model:
                 sys.stderr.write(
                     f"Server already running with model {status['model']}. "
                     "Stop it before using a different model.\n"

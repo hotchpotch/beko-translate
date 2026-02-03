@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
 from . import cli as neko_cli
+from .translation_models import resolve_model_alias
 
 DEFAULT_MODEL = "hotchpotch/CAT-Translate-1.4b-mlx-q8"
 DEFAULT_INPUT_LANG = "en"
@@ -114,7 +115,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--trust-remote-code",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Trust remote code when loading tokenizers.",
     )
     parser.add_argument(
@@ -599,9 +601,11 @@ def main() -> int:
     neko_cli.ensure_directory(log_path.parent)
     neko_cli.configure_logging(args.verbose)
 
+    model = resolve_model_alias(args.model, DEFAULT_MODEL)
+
     if not args.dry_run:
         ensure_neko_translate_server(
-            model=args.model,
+            model=model,
             socket_path=socket_path,
             log_path=log_path,
             trust_remote_code=args.trust_remote_code,
@@ -655,7 +659,7 @@ def main() -> int:
             print(f"[retranslate] Overwriting {dest.name}.")
 
         cli_command = build_neko_translate_command(
-            model=args.model,
+            model=model,
             socket_path=socket_path,
             log_path=log_path,
             lang_in=lang_in,
