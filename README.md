@@ -9,6 +9,7 @@ Apple Silicon + MLX で日本語/英語の翻訳を回すための小さな CLI 
 - 常駐サーバーで起動コストを削減
 - 対話モード（引数なしで起動すると REPL）
 - ストリーミング出力（対話モードはデフォルト ON）
+- PDF 翻訳（pdf2zh_next + cat-translate）
 
 ## インストール
 
@@ -83,6 +84,35 @@ uv run cat-translate server start \
 uv run cat-translate server status
 ```
 
+### 5) PDF 翻訳
+
+pdf2zh_next を使って PDF を丸ごと翻訳します。翻訳は cat-translate サーバー経由です。
+
+```bash
+uv run cat-translate-pdf paper.pdf
+```
+
+デフォルトは `--input en --output ja` です。自動判定したい場合:
+
+```bash
+uv run cat-translate-pdf paper.pdf --input auto
+```
+
+和英:
+
+```bash
+uv run cat-translate-pdf paper_ja.pdf --input ja --output en
+```
+
+出力ファイル/ディレクトリを指定:
+
+```bash
+uv run cat-translate-pdf paper.pdf --output-pdf translated.pdf
+uv run cat-translate-pdf paper.pdf --output-dir ./out
+```
+
+サーバーは 1.4b q8 がデフォルトで、別モデルが動いていたら自動的に停止して起動し直します。
+
 ## モデル
 
 デフォルトは以下です。
@@ -100,6 +130,10 @@ uv run cat-translate server status
 ```bash
 uv run cat-translate --model hotchpotch/CAT-Translate-1.4b-mlx-q8 --text "こんにちは"
 ```
+
+PDF 翻訳 (`cat-translate-pdf`) のデフォルトは以下です。
+
+- `hotchpotch/CAT-Translate-1.4b-mlx-q8`
 
 ## オプション
 

@@ -7,6 +7,7 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
 ## Development Workflow
 - Install deps: `uv sync` (or `uv add --dev ...` when adding dev tools)
 - Run CLI: `uv run cat-translate --text "Hello" --input-lang en --output-lang ja`
+- PDF CLI: `uv run cat-translate-pdf paper.pdf --input en --output ja`
 - Interactive (default when no args + tty): `uv run cat-translate`
 - Streaming (one-shot): `uv run cat-translate --stream --server never --text "こんにちは"`
 - Server mode:
@@ -23,6 +24,7 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
 ## Key Directories
 - `cat_translate/`
   - `cli.py`: MLX-only translation CLI implementation
+  - `pdf_cli.py`: PDF translation CLI (pdf2zh_next + cat-translate)
   - `__init__.py`: exposes `main`
 - `scripts/`
   - `to_mlx.py`: convert HF models to MLX (q4/q8) using `mlx_lm.convert`
@@ -45,3 +47,4 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
 - `cat-translate` supports `--text` or stdin input.
 - If `--input-lang` and `--output-lang` are omitted, `fast-langdetect` is used to
   detect English/Japanese (k=3) and infer the direction.
+- `cat-translate-pdf` defaults to en->ja and uses `hotchpotch/CAT-Translate-1.4b-mlx-q8`.

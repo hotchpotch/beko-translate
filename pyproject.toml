@@ -8,6 +8,7 @@ dependencies = []
 
 [project.scripts]
 cat-translate = "cat_translate:main"
+cat-translate-pdf = "cat_translate.pdf_cli:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
@@ -20,6 +21,7 @@ packages = ["cat_translate"]
 dev = [
     "fast-langdetect>=1.0.0",
     "mlx-lm>=0.29.1",
+    "pypdf>=6.6.2",
     "pytest>=9.0.2",
     "ruff>=0.14.14",
     "torch>=2.10.0",
