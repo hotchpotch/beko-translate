@@ -120,17 +120,32 @@ uv run neko-translate-pdf paper.pdf --output-dir ./out
 
 - `hotchpotch/CAT-Translate-0.8b-mlx-q4`
 
-他のモデルも指定できます。
-
-- `hotchpotch/CAT-Translate-0.8b-mlx-q8`
-- `hotchpotch/CAT-Translate-1.4b-mlx-q4`
-- `hotchpotch/CAT-Translate-1.4b-mlx-q8`
-- `mlx-community/HY-MT1.5-1.8B-4bit`
-- `mlx-community/HY-MT1.5-1.8B-8bit`
-- `mlx-community/HY-MT1.5-7B-4bit`
-- `mlx-community/HY-MT1.5-7B-8bit`
-
 短いエイリアスも用意しています（例: `hymt`）。
+
+モデルのおすすめとライセンス:
+
+- **PLaMo 2 Translate（おすすめ）**
+  - 論文や技術文書の翻訳品質が特に良く、まずこれを試すのがおすすめです。
+  - 利用には **PLaMo Community License** への同意が必要です（条件付きで商用利用も可能）。
+  - ライセンス: [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-ja)
+- **CAT-Translate**
+  - MIT ライセンスのため、商用利用でも制約が少なく扱いやすいです。
+- **HY-MT**
+  - 利用にはライセンスへの同意が必要です。
+  - ライセンス: [HY-MT License](https://github.com/Tencent-Hunyuan/HY-MT/blob/main/License.txt)
+
+このプロジェクト（neko-translate 自体）のソースコードは MIT ですが、**利用する翻訳モデルのライセンスはモデルごとに異なります**。必ず各モデルのライセンスを確認してください。
+
+### 動作確認済みの MLX 翻訳モデル（Hugging Face / ライセンス）
+
+| Model | Hugging Face name | License |
+| --- | --- | --- |
+| [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-0.8b-mlx-q4` | MIT |
+| [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-0.8b-mlx-q8` | MIT |
+| [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-1.4b-mlx-q4` | MIT |
+| [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-1.4b-mlx-q8` | MIT |
+| [PLaMo 2 Translate](https://huggingface.co/pfnet/plamo-2-translate) | `mlx-community/plamo-2-translate` | [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-ja) |
+| [HY-MT 1.5](https://github.com/Tencent-Hunyuan/HY-MT) | `mlx-community/HY-MT1.5-1.8B-4bit` / `mlx-community/HY-MT1.5-1.8B-8bit` / `mlx-community/HY-MT1.5-7B-4bit` / `mlx-community/HY-MT1.5-7B-8bit` | [HY-MT License](https://github.com/Tencent-Hunyuan/HY-MT/blob/main/License.txt) |
 
 例:
 
