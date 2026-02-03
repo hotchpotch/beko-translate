@@ -21,6 +21,7 @@ packages = ["neko_translate"]
 dev = [
     "fast-langdetect>=1.0.0",
     "mlx-lm>=0.29.1",
+    "numba>=0.63.1",
     "pypdf>=6.6.2",
     "pytest>=9.0.2",
     "ruff>=0.14.14",

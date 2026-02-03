@@ -17,7 +17,7 @@ import itertools
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-PROMPT_TEMPLATE = "Translate the following {src_lang} text into {tgt_lang}.\n\n{src_text}"
+from .translation_models import resolve_translation_model
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
 DEFAULT_SOCKET_NAME = "neko-translate.sock"
 DEFAULT_LOG_NAME = "server.log"
@@ -47,10 +47,6 @@ LANG_CODE_MAP = {
     "en": "en",
     "eng": "en",
     "english": "en",
-}
-LANG_NAME_MAP = {
-    "ja": "Japanese",
-    "en": "English",
 }
 SUPPORTED_LANGS = {"ja", "en"}
 
@@ -352,12 +348,18 @@ def resolve_languages(args: argparse.Namespace, text: str) -> tuple[str, str]:
 def _load_model(model: str, trust_remote_code: bool):
     from mlx_lm import load
 
-    return load(
+    translator = resolve_translation_model(model)
+    model_config = translator.model_config(trust_remote_code)
+    tokenizer_config = translator.tokenizer_config(trust_remote_code)
+    loaded = load(
         model,
-        tokenizer_config={
-            "trust_remote_code": True if trust_remote_code else None
-        },
+        model_config=model_config or None,
+        tokenizer_config=tokenizer_config or None,
     )
+    model_obj = loaded[0]
+    tokenizer = loaded[1]
+    translator.configure_tokenizer(tokenizer)
+    return model_obj, tokenizer, translator
 
 
 def configure_logging(verbose: bool) -> None:
@@ -456,63 +458,84 @@ def resolve_state_path(value: str | None) -> Path:
     return DEFAULT_CONFIG_DIR / DEFAULT_STATE_NAME
 
 
-def _prepare_prompt(tokenizer: Any, prompt: str, no_chat_template: bool) -> str:
-    if not no_chat_template and hasattr(tokenizer, "apply_chat_template"):
-        messages = [{"role": "user", "content": prompt}]
-        return tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=False,
-        )
-    return prompt
+def _build_prompt(
+    *,
+    translator: Any,
+    tokenizer: Any,
+    text: str,
+    src_lang: str,
+    tgt_lang: str,
+    no_chat_template: bool,
+) -> str:
+    return translator.render_prompt(
+        tokenizer,
+        src_lang=src_lang,
+        tgt_lang=tgt_lang,
+        text=text,
+        no_chat_template=no_chat_template,
+    )
 
 
 def _resolve_generation_args(args: argparse.Namespace) -> dict[str, Any]:
+    max_new_tokens = getattr(args, "max_new_tokens", None)
+    temperature = getattr(args, "temperature", None)
+    top_p = getattr(args, "top_p", None)
+    top_k = getattr(args, "top_k", None)
+    no_chat_template = getattr(args, "no_chat_template", None)
+    no_repeat_ngram = getattr(args, "no_repeat_ngram", None)
+    no_repeat_window = getattr(args, "no_repeat_window", None)
     return {
         "max_new_tokens": (
             DEFAULT_MAX_NEW_TOKENS
-            if args.max_new_tokens is None
-            else args.max_new_tokens
+            if max_new_tokens is None
+            else max_new_tokens
         ),
         "temperature": (
-            DEFAULT_TEMPERATURE if args.temperature is None else args.temperature
+            DEFAULT_TEMPERATURE if temperature is None else temperature
         ),
-        "top_p": (DEFAULT_TOP_P if args.top_p is None else args.top_p),
-        "top_k": (DEFAULT_TOP_K if args.top_k is None else args.top_k),
+        "top_p": (DEFAULT_TOP_P if top_p is None else top_p),
+        "top_k": (DEFAULT_TOP_K if top_k is None else top_k),
         "no_chat_template": (
             DEFAULT_NO_CHAT_TEMPLATE
-            if args.no_chat_template is None
-            else args.no_chat_template
+            if no_chat_template is None
+            else no_chat_template
         ),
         "no_repeat_ngram": (
             DEFAULT_NO_REPEAT_NGRAM
-            if args.no_repeat_ngram is None
-            else args.no_repeat_ngram
+            if no_repeat_ngram is None
+            else no_repeat_ngram
         ),
         "no_repeat_window": (
             DEFAULT_NO_REPEAT_WINDOW
-            if args.no_repeat_window is None
-            else args.no_repeat_window
+            if no_repeat_window is None
+            else no_repeat_window
         ),
     }
 
 
 def _build_request_overrides(args: argparse.Namespace) -> dict[str, Any]:
     payload: dict[str, Any] = {}
-    if args.max_new_tokens is not None:
-        payload["max_new_tokens"] = args.max_new_tokens
-    if args.temperature is not None:
-        payload["temperature"] = args.temperature
-    if args.top_p is not None:
-        payload["top_p"] = args.top_p
-    if args.top_k is not None:
-        payload["top_k"] = args.top_k
-    if args.no_chat_template is not None:
-        payload["no_chat_template"] = args.no_chat_template
-    if args.no_repeat_ngram is not None:
-        payload["no_repeat_ngram"] = args.no_repeat_ngram
-    if args.no_repeat_window is not None:
-        payload["no_repeat_window"] = args.no_repeat_window
+    max_new_tokens = getattr(args, "max_new_tokens", None)
+    temperature = getattr(args, "temperature", None)
+    top_p = getattr(args, "top_p", None)
+    top_k = getattr(args, "top_k", None)
+    no_chat_template = getattr(args, "no_chat_template", None)
+    no_repeat_ngram = getattr(args, "no_repeat_ngram", None)
+    no_repeat_window = getattr(args, "no_repeat_window", None)
+    if max_new_tokens is not None:
+        payload["max_new_tokens"] = max_new_tokens
+    if temperature is not None:
+        payload["temperature"] = temperature
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if top_k is not None:
+        payload["top_k"] = top_k
+    if no_chat_template is not None:
+        payload["no_chat_template"] = no_chat_template
+    if no_repeat_ngram is not None:
+        payload["no_repeat_ngram"] = no_repeat_ngram
+    if no_repeat_window is not None:
+        payload["no_repeat_window"] = no_repeat_window
     return payload
 
 
@@ -525,14 +548,13 @@ def _generate_text(
     temperature: float,
     top_p: float,
     top_k: int,
-    no_chat_template: bool,
     no_repeat_ngram: int,
     no_repeat_window: int,
 ) -> str:
     from mlx_lm.generate import generate
     from mlx_lm.sample_utils import make_sampler
 
-    prompt_text = _prepare_prompt(tokenizer, prompt, no_chat_template)
+    prompt_text = prompt
     sampler = None
     if (
         (temperature and temperature > 0)
@@ -566,14 +588,13 @@ def _stream_text(
     temperature: float,
     top_p: float,
     top_k: int,
-    no_chat_template: bool,
     no_repeat_ngram: int,
     no_repeat_window: int,
 ) -> str:
     from mlx_lm.generate import stream_generate
     from mlx_lm.sample_utils import make_sampler
 
-    prompt_text = _prepare_prompt(tokenizer, prompt, no_chat_template)
+    prompt_text = prompt
     sampler = None
     if (
         (temperature and temperature > 0)
@@ -880,11 +901,17 @@ def _start_server(
     return _wait_for_server(socket_path, state_path=state_path)
 
 
-def run_mlx(prompt: str, args: argparse.Namespace) -> str:
-    loaded = _load_model(args.model, args.trust_remote_code)
-    model = loaded[0]
-    tokenizer = loaded[1]
+def run_mlx(text: str, src_lang: str, tgt_lang: str, args: argparse.Namespace) -> str:
+    model, tokenizer, translator = _load_model(args.model, args.trust_remote_code)
     gen_args = _resolve_generation_args(args)
+    prompt = _build_prompt(
+        translator=translator,
+        tokenizer=tokenizer,
+        text=text,
+        src_lang=src_lang,
+        tgt_lang=tgt_lang,
+        no_chat_template=gen_args["no_chat_template"],
+    )
     return _generate_text(
         model,
         tokenizer,
@@ -893,7 +920,6 @@ def run_mlx(prompt: str, args: argparse.Namespace) -> str:
         temperature=gen_args["temperature"],
         top_p=gen_args["top_p"],
         top_k=gen_args["top_k"],
-        no_chat_template=gen_args["no_chat_template"],
         no_repeat_ngram=gen_args["no_repeat_ngram"],
         no_repeat_window=gen_args["no_repeat_window"],
     )
@@ -904,6 +930,7 @@ def _handle_request(
     *,
     model: Any,
     tokenizer: Any,
+    translator: Any,
     model_name: str,
     defaults: dict[str, Any],
 ) -> bool:
@@ -942,7 +969,10 @@ def _handle_request(
 
     if req_type == "translate":
         request_id = next(_REQUEST_COUNTER)
-        prompt = request.get("prompt", "")
+        text = request.get("text", "")
+        src_lang = request.get("src_lang")
+        tgt_lang = request.get("tgt_lang")
+        prompt = request.get("prompt")
         max_new_tokens = request.get("max_new_tokens", defaults["max_new_tokens"])
         temperature = request.get("temperature", defaults["temperature"])
         top_p = request.get("top_p", defaults["top_p"])
@@ -956,11 +986,36 @@ def _handle_request(
         no_chat_template = request.get(
             "no_chat_template", defaults["no_chat_template"]
         )
+        if prompt is None:
+            if not isinstance(src_lang, str) or not isinstance(tgt_lang, str):
+                response = {"ok": False, "error": "missing_language"}
+                _write_response(file, response)
+                return False
+            if not isinstance(text, str) or not text:
+                response = {"ok": False, "error": "missing_text"}
+                _write_response(file, response)
+                return False
+            prompt = _build_prompt(
+                translator=translator,
+                tokenizer=tokenizer,
+                text=text,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                no_chat_template=bool(no_chat_template),
+            )
+        else:
+            if not isinstance(prompt, str):
+                response = {"ok": False, "error": "invalid_prompt"}
+                _write_response(file, response)
+                return False
         _log_server_event(
             "translate_start",
             {
                 "id": request_id,
                 "model": model_name,
+                "src_lang": src_lang,
+                "tgt_lang": tgt_lang,
+                "text_head": _log_snippet(text) if isinstance(text, str) else "",
                 "prompt_len": len(prompt),
                 "prompt_head": _log_snippet(prompt),
                 "max_new_tokens": int(max_new_tokens),
@@ -982,7 +1037,6 @@ def _handle_request(
                 temperature=float(temperature),
                 top_p=float(top_p),
                 top_k=int(top_k),
-                no_chat_template=bool(no_chat_template),
                 no_repeat_ngram=int(no_repeat_ngram),
                 no_repeat_window=int(no_repeat_window),
             )
@@ -1074,9 +1128,7 @@ def _run_server(args: argparse.Namespace) -> int:
         "no_repeat_ngram": args.no_repeat_ngram,
         "no_repeat_window": args.no_repeat_window,
     }
-    loaded = _load_model(model_name, args.trust_remote_code)
-    model = loaded[0]
-    tokenizer = loaded[1]
+    model, tokenizer, translator = _load_model(model_name, args.trust_remote_code)
     _write_state(
         state_path,
         {
@@ -1104,6 +1156,7 @@ def _run_server(args: argparse.Namespace) -> int:
                     conn,
                     model=model,
                     tokenizer=tokenizer,
+                    translator=translator,
                     model_name=model_name,
                     defaults=defaults,
                 )
@@ -1330,12 +1383,16 @@ def _server_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def _translate_via_server(args: argparse.Namespace, prompt: str) -> str | None:
+def _translate_via_server(
+    args: argparse.Namespace, text: str, src_lang: str, tgt_lang: str
+) -> str | None:
     socket_path = resolve_socket_path(args.socket)
     overrides = _build_request_overrides(args)
     payload = {
         "type": "translate",
-        "prompt": prompt,
+        "text": text,
+        "src_lang": src_lang,
+        "tgt_lang": tgt_lang,
         **overrides,
     }
     deadline = time.time() + TRANSLATE_CONNECT_DEADLINE
@@ -1352,7 +1409,9 @@ def _translate_via_server(args: argparse.Namespace, prompt: str) -> str | None:
         time.sleep(TRANSLATE_CONNECT_SLEEP)
 
 
-def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
+def _translate_text(
+    text: str, src_lang: str, tgt_lang: str, args: argparse.Namespace
+) -> int:
     server_mode = args.server
     socket_path = resolve_socket_path(args.socket)
     state_path = resolve_state_path(None)
@@ -1377,7 +1436,7 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
                 return 1
             if args.verbose:
                 sys.stderr.write(f"[INFO] Using server at {socket_path}\n")
-            translation = _translate_via_server(args, prompt)
+            translation = _translate_via_server(args, text, src_lang, tgt_lang)
             if translation is None:
                 sys.stderr.write("Server failed to translate.\n")
                 return 1
@@ -1404,7 +1463,7 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
         if status:
             if args.verbose:
                 sys.stderr.write(f"[INFO] Started server at {socket_path}\n")
-            translation = _translate_via_server(args, prompt)
+            translation = _translate_via_server(args, text, src_lang, tgt_lang)
             if translation is None:
                 sys.stderr.write("Server failed to translate.\n")
                 return 1
@@ -1416,9 +1475,17 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
 
     args.model = model
     gen_args = _resolve_generation_args(args)
-    loaded = _load_model(args.model, args.trust_remote_code)
-    model_obj = loaded[0]
-    tokenizer = loaded[1]
+    model_obj, tokenizer, translator = _load_model(
+        args.model, args.trust_remote_code
+    )
+    prompt = _build_prompt(
+        translator=translator,
+        tokenizer=tokenizer,
+        text=text,
+        src_lang=src_lang,
+        tgt_lang=tgt_lang,
+        no_chat_template=gen_args["no_chat_template"],
+    )
     with silence_stderr(not args.verbose):
         if args.stream:
             _stream_text(
@@ -1429,7 +1496,6 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
                 temperature=gen_args["temperature"],
                 top_p=gen_args["top_p"],
                 top_k=gen_args["top_k"],
-                no_chat_template=gen_args["no_chat_template"],
                 no_repeat_ngram=gen_args["no_repeat_ngram"],
                 no_repeat_window=gen_args["no_repeat_window"],
             )
@@ -1442,7 +1508,6 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
                 temperature=gen_args["temperature"],
                 top_p=gen_args["top_p"],
                 top_k=gen_args["top_k"],
-                no_chat_template=gen_args["no_chat_template"],
                 no_repeat_ngram=gen_args["no_repeat_ngram"],
                 no_repeat_window=gen_args["no_repeat_window"],
             )
@@ -1454,12 +1519,7 @@ def _handle_translate(args: argparse.Namespace) -> int:
     configure_logging(args.verbose)
     text = read_text(args)
     input_lang, output_lang = resolve_languages(args, text)
-    prompt = PROMPT_TEMPLATE.format(
-        src_lang=LANG_NAME_MAP[input_lang],
-        tgt_lang=LANG_NAME_MAP[output_lang],
-        src_text=text,
-    )
-    return _translate_prompt(prompt, args)
+    return _translate_text(text, input_lang, output_lang, args)
 
 
 def _run_interactive(args: argparse.Namespace) -> int:
@@ -1480,12 +1540,7 @@ def _run_interactive(args: argparse.Namespace) -> int:
         if line.lower() in {"exit", "quit", "q"}:
             break
         input_lang, output_lang = resolve_languages(args, line)
-        prompt = PROMPT_TEMPLATE.format(
-            src_lang=LANG_NAME_MAP[input_lang],
-            tgt_lang=LANG_NAME_MAP[output_lang],
-            src_text=line,
-        )
-        _translate_prompt(prompt, args)
+        _translate_text(line, input_lang, output_lang, args)
     return 0
 
 

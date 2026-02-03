@@ -23,16 +23,11 @@ def test_translate_with_remote_mlx_model() -> None:
         top_p=1.0,
         top_k=0,
     )
-    prompt = cli.PROMPT_TEMPLATE.format(
-        src_lang="English",
-        tgt_lang="Japanese",
-        src_text="Hello, world.",
-    )
     cli._load_model.cache_clear()
     info_before = cli._load_model.cache_info()
-    translation = cli.run_mlx(prompt, args)
+    translation = cli.run_mlx("Hello, world.", "en", "ja", args)
     info_after = cli._load_model.cache_info()
-    translation_second = cli.run_mlx(prompt, args)
+    translation_second = cli.run_mlx("Hello, world.", "en", "ja", args)
     info_final = cli._load_model.cache_info()
     assert info_after.misses == info_before.misses + 1
     assert info_final.hits >= info_after.hits + 1
