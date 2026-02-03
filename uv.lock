@@ -25,7 +25,7 @@ wheels = [
 ]
 
 [[package]]
-name = "cat-translate-cli"
+name = "neko-translate-cli"
 version = "0.1.0"
 source = { editable = "." }
 

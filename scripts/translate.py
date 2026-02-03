@@ -20,7 +20,7 @@ def normalize_lang(value: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Translate text with CAT-Translate (Hugging Face or MLX)."
+        description="Translate text with NEKO-Translate (Hugging Face or MLX)."
     )
     parser.add_argument(
         "--backend",

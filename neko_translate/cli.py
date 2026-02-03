@@ -19,12 +19,12 @@ from typing import Any, Iterable, Iterator
 
 PROMPT_TEMPLATE = "Translate the following {src_lang} text into {tgt_lang}.\n\n{src_text}"
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
-DEFAULT_SOCKET_NAME = "cat-translate.sock"
+DEFAULT_SOCKET_NAME = "neko-translate.sock"
 DEFAULT_LOG_NAME = "server.log"
 DEFAULT_STATE_NAME = "server.json"
 SERVER_MODES = ("auto", "always", "never")
 DEFAULT_SERVER_MODE = "auto"
-DEFAULT_CONFIG_DIR = Path("~/.config/cat-translate").expanduser()
+DEFAULT_CONFIG_DIR = Path("~/.config/neko-translate").expanduser()
 DEFAULT_MAX_NEW_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_TOP_P = 0.9
@@ -57,13 +57,13 @@ SUPPORTED_LANGS = {"ja", "en"}
 
 def build_translate_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Translate with CAT-Translate (MLX only).",
+        description="Translate with NEKO-Translate (MLX only).",
         epilog=(
             "Server commands:\n"
-            "  cat-translate server start\n"
-            "  cat-translate server stop\n"
-            "  cat-translate server status\n"
-            "  cat-translate server run\n"
+            "  neko-translate server start\n"
+            "  neko-translate server stop\n"
+            "  neko-translate server status\n"
+            "  neko-translate server run\n"
             "Use --socket/--log-file to control server paths."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -155,13 +155,13 @@ def build_translate_parser() -> argparse.ArgumentParser:
         "--socket",
         type=str,
         default=None,
-        help="Unix domain socket path (default: ~/.config/cat-translate/cat-translate.sock).",
+        help="Unix domain socket path (default: ~/.config/neko-translate/neko-translate.sock).",
     )
     parser.add_argument(
         "--log-file",
         type=str,
         default=None,
-        help="Server log file path (default: ~/.config/cat-translate/server.log).",
+        help="Server log file path (default: ~/.config/neko-translate/server.log).",
     )
     parser.add_argument(
         "--verbose",
@@ -182,7 +182,7 @@ SERVER_ACTIONS = ("start", "stop", "status", "run")
 def build_server_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Manage CAT-Translate MLX server. Actions: start, stop, status, run."
+            "Manage NEKO-Translate MLX server. Actions: start, stop, status, run."
         ),
     )
     parser.add_argument(
@@ -198,13 +198,13 @@ def build_server_parser() -> argparse.ArgumentParser:
         "--socket",
         type=str,
         default=None,
-        help="Unix domain socket path (default: ~/.config/cat-translate/cat-translate.sock).",
+        help="Unix domain socket path (default: ~/.config/neko-translate/neko-translate.sock).",
     )
     parser.add_argument(
         "--log-file",
         type=str,
         default=None,
-        help="Server log file path (default: ~/.config/cat-translate/server.log).",
+        help="Server log file path (default: ~/.config/neko-translate/server.log).",
     )
     parser.add_argument(
         "--trust-remote-code",
@@ -432,7 +432,7 @@ def ensure_directory(path: Path, mode: int = 0o700) -> None:
 def resolve_socket_path(value: str | None) -> Path:
     if value:
         return Path(value).expanduser()
-    env = os.environ.get("CAT_TRANSLATE_SOCKET")
+    env = os.environ.get("NEKO_TRANSLATE_SOCKET")
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_SOCKET_NAME
@@ -441,7 +441,7 @@ def resolve_socket_path(value: str | None) -> Path:
 def resolve_log_path(value: str | None) -> Path:
     if value:
         return Path(value).expanduser()
-    env = os.environ.get("CAT_TRANSLATE_LOG")
+    env = os.environ.get("NEKO_TRANSLATE_LOG")
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_LOG_NAME
@@ -450,7 +450,7 @@ def resolve_log_path(value: str | None) -> Path:
 def resolve_state_path(value: str | None) -> Path:
     if value:
         return Path(value).expanduser()
-    env = os.environ.get("CAT_TRANSLATE_STATE")
+    env = os.environ.get("NEKO_TRANSLATE_STATE")
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_STATE_NAME
@@ -844,7 +844,7 @@ def _start_server(
     cmd = [
         sys.executable,
         "-m",
-        "cat_translate.cli",
+        "neko_translate.cli",
         "server",
         "run",
         "--model",

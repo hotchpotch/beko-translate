@@ -1,20 +1,20 @@
-# CAT-Translate CLI - Agent Notes
+# NEKO-Translate CLI - Agent Notes
 
 ## Overview
-This project provides a small MLX-based translation CLI for CAT-Translate.
-The primary entrypoint is the `cat-translate` command (installed via `uv run`).
+This project provides a small MLX-based translation CLI for NEKO-Translate.
+The primary entrypoint is the `neko-translate` command (installed via `uv run`).
 
 ## Development Workflow
 - Install deps: `uv sync` (or `uv add --dev ...` when adding dev tools)
-- Run CLI: `uv run cat-translate --text "Hello" --input-lang en --output-lang ja`
-- PDF CLI: `uv run cat-translate-pdf paper.pdf --input en --output ja`
-- Interactive (default when no args + tty): `uv run cat-translate`
-- Streaming (one-shot): `uv run cat-translate --stream --server never --text "こんにちは"`
+- Run CLI: `uv run neko-translate --text "Hello" --input-lang en --output-lang ja`
+- PDF CLI: `uv run neko-translate-pdf paper.pdf --input en --output ja`
+- Interactive (default when no args + tty): `uv run neko-translate`
+- Streaming (one-shot): `uv run neko-translate --stream --server never --text "こんにちは"`
 - Server mode:
-  - Start: `uv run cat-translate server start`
-  - Status: `uv run cat-translate server status`
-  - Stop: `uv run cat-translate server stop`
-  - Use server automatically: `uv run cat-translate --server auto`
+  - Start: `uv run neko-translate server start`
+  - Status: `uv run neko-translate server status`
+  - Stop: `uv run neko-translate server stop`
+  - Use server automatically: `uv run neko-translate --server auto`
 - Run tests + lint + typecheck: `uv run tox` (includes MLX integration tests)
   - Lint only: `uv run ruff check .`
   - Typecheck only: `uv run ty check`
@@ -22,9 +22,9 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
   - MLX integration tests: `RUN_MLX_INTEGRATION=1 uv run pytest -m integration`
 
 ## Key Directories
-- `cat_translate/`
+- `neko_translate/`
   - `cli.py`: MLX-only translation CLI implementation
-  - `pdf_cli.py`: PDF translation CLI (pdf2zh_next + cat-translate)
+  - `pdf_cli.py`: PDF translation CLI (pdf2zh_next + neko-translate)
   - `__init__.py`: exposes `main`
 - `scripts/`
   - `to_mlx.py`: convert HF models to MLX (q4/q8) using `mlx_lm.convert`
@@ -44,7 +44,7 @@ The primary entrypoint is the `cat-translate` command (installed via `uv run`).
   - `hotchpotch/CAT-Translate-1.4b-mlx-q8`
 
 ## Notes
-- `cat-translate` supports `--text` or stdin input.
+- `neko-translate` supports `--text` or stdin input.
 - If `--input-lang` and `--output-lang` are omitted, `fast-langdetect` is used to
   detect English/Japanese (k=3) and infer the direction.
-- `cat-translate-pdf` defaults to en->ja and uses `hotchpotch/CAT-Translate-1.4b-mlx-q8`.
+- `neko-translate-pdf` defaults to en->ja and uses `hotchpotch/CAT-Translate-1.4b-mlx-q8`.

@@ -5,7 +5,7 @@ import argparse
 
 import pytest
 
-from cat_translate import cli
+from neko_translate import cli
 
 
 @pytest.mark.integration

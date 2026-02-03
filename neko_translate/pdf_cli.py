@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-from . import cli as cat_cli
+from . import cli as neko_cli
 
 DEFAULT_MODEL = "hotchpotch/CAT-Translate-1.4b-mlx-q8"
 DEFAULT_INPUT_LANG = "en"
@@ -20,7 +20,7 @@ DEFAULT_OUTPUT_LANG = "ja"
 DEFAULT_AUTO_TRANSLATE_DIR = Path.home() / "Downloads"
 
 PDF2ZH_COMMAND = os.environ.get("PDF2ZH_COMMAND", "uvx pdf2zh_next")
-CAT_TRANSLATE_COMMAND = os.environ.get("CAT_TRANSLATE_COMMAND")
+NEKO_TRANSLATE_COMMAND = os.environ.get("NEKO_TRANSLATE_COMMAND")
 
 LANG_ALIASES = {
     "en": "en",
@@ -44,7 +44,7 @@ DEFAULT_PDF2ZH_ARGS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Translate PDFs with pdf2zh_next via cat-translate.",
+        description="Translate PDFs with pdf2zh_next via neko-translate.",
     )
     parser.add_argument(
         "pdf",
@@ -105,7 +105,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--socket",
         default=None,
-        help="Unix domain socket path for cat-translate server.",
+        help="Unix domain socket path for neko-translate server.",
     )
     parser.add_argument(
         "--log-file",
@@ -126,19 +126,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--temperature",
         type=float,
-        default=cat_cli.DEFAULT_TEMPERATURE,
+        default=neko_cli.DEFAULT_TEMPERATURE,
         help="Sampling temperature. 0 disables sampling.",
     )
     parser.add_argument(
         "--top-p",
         type=float,
-        default=cat_cli.DEFAULT_TOP_P,
+        default=neko_cli.DEFAULT_TOP_P,
         help="Top-p sampling value.",
     )
     parser.add_argument(
         "--top-k",
         type=int,
-        default=cat_cli.DEFAULT_TOP_K,
+        default=neko_cli.DEFAULT_TOP_K,
         help="Top-k sampling value.",
     )
     parser.add_argument(
@@ -388,7 +388,7 @@ def translate_pdf(
     return True
 
 
-def build_cat_translate_command(
+def build_neko_translate_command(
     *,
     model: str,
     socket_path: Path,
@@ -398,10 +398,10 @@ def build_cat_translate_command(
     trust_remote_code: bool,
     no_chat_template: bool,
 ) -> str:
-    if CAT_TRANSLATE_COMMAND:
-        base_command = CAT_TRANSLATE_COMMAND
+    if NEKO_TRANSLATE_COMMAND:
+        base_command = NEKO_TRANSLATE_COMMAND
     else:
-        base_command = f"{sys.executable} -m cat_translate.cli"
+        base_command = f"{sys.executable} -m neko_translate.cli"
 
     command = shlex.split(base_command)
     command += [
@@ -433,13 +433,13 @@ def wait_for_server_stop(
 ) -> bool:
     start = time.time()
     while time.time() - start < timeout:
-        if not cat_cli._get_server_status(socket_path, state_path=state_path):
+        if not neko_cli._get_server_status(socket_path, state_path=state_path):
             return True
         time.sleep(0.2)
     return False
 
 
-def ensure_cat_translate_server(
+def ensure_neko_translate_server(
     *,
     model: str,
     socket_path: Path,
@@ -452,13 +452,13 @@ def ensure_cat_translate_server(
     top_k: int,
     no_chat_template: bool,
 ) -> None:
-    state_path = cat_cli.resolve_state_path(None)
-    status = cat_cli._get_server_status(socket_path, state_path=state_path)
+    state_path = neko_cli.resolve_state_path(None)
+    status = neko_cli._get_server_status(socket_path, state_path=state_path)
     if status and status.get("model") != model:
         sys.stderr.write(
             f"[WARN] Server running with model {status.get('model')}; restarting with {model}.\n"
         )
-        response = cat_cli._send_request(socket_path, {"type": "stop"}, timeout=2.0)
+        response = neko_cli._send_request(socket_path, {"type": "stop"}, timeout=2.0)
         if not response or not response.get("ok"):
             raise SystemExit("Failed to stop existing server.")
         if not wait_for_server_stop(socket_path, state_path):
@@ -470,7 +470,7 @@ def ensure_cat_translate_server(
             sys.stderr.write(f"[INFO] Using existing server (model={status.get('model')}).\n")
         return
 
-    started = cat_cli._start_server(
+    started = neko_cli._start_server(
         model=model,
         socket_path=socket_path,
         log_path=log_path,
@@ -484,7 +484,7 @@ def ensure_cat_translate_server(
         no_chat_template=no_chat_template,
     )
     if not started:
-        raise SystemExit("Failed to start cat-translate server.")
+        raise SystemExit("Failed to start neko-translate server.")
     if verbose:
         sys.stderr.write(
             f"[INFO] Server started (model={started.get('model')}, socket={socket_path}).\n"
@@ -593,14 +593,14 @@ def main() -> int:
 
     ensure_command_available(PDF2ZH_COMMAND)
 
-    socket_path = cat_cli.resolve_socket_path(args.socket)
-    log_path = cat_cli.resolve_log_path(args.log_file)
-    cat_cli.ensure_directory(socket_path.parent)
-    cat_cli.ensure_directory(log_path.parent)
-    cat_cli.configure_logging(args.verbose)
+    socket_path = neko_cli.resolve_socket_path(args.socket)
+    log_path = neko_cli.resolve_log_path(args.log_file)
+    neko_cli.ensure_directory(socket_path.parent)
+    neko_cli.ensure_directory(log_path.parent)
+    neko_cli.configure_logging(args.verbose)
 
     if not args.dry_run:
-        ensure_cat_translate_server(
+        ensure_neko_translate_server(
             model=args.model,
             socket_path=socket_path,
             log_path=log_path,
@@ -654,7 +654,7 @@ def main() -> int:
         if dest.exists():
             print(f"[retranslate] Overwriting {dest.name}.")
 
-        cli_command = build_cat_translate_command(
+        cli_command = build_neko_translate_command(
             model=args.model,
             socket_path=socket_path,
             log_path=log_path,

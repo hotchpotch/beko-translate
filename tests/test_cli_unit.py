@@ -4,7 +4,7 @@ import argparse
 
 import pytest
 
-import cat_translate.cli as cli
+import neko_translate.cli as cli
 
 def make_args(**kwargs):
     return argparse.Namespace(**kwargs)

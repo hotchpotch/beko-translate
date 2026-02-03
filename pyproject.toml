@@ -1,5 +1,5 @@
 [project]
-name = "cat-translate-cli"
+name = "neko-translate-cli"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -7,15 +7,15 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
-cat-translate = "cat_translate:main"
-cat-translate-pdf = "cat_translate.pdf_cli:main"
+neko-translate = "neko_translate:main"
+neko-translate-pdf = "neko_translate.pdf_cli:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["cat_translate"]
+packages = ["neko_translate"]
 
 [dependency-groups]
 dev = [
