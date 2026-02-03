@@ -420,6 +420,9 @@ def resolve_languages(args: argparse.Namespace, text: str) -> tuple[str, str]:
     if input_lang == output_lang:
         raise SystemExit("Input and output languages must be different.")
 
+    if input_lang is None or output_lang is None:
+        raise SystemExit("Input and output languages must be specified.")
+
     return input_lang, output_lang
 
 
