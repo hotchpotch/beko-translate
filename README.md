@@ -5,6 +5,7 @@ Apple Silicon + MLX で日本語/英語の翻訳を回すための小さな CLI 
 ## できること
 
 - 日本語 <-> 英語の翻訳（入力を自動判定）
+- モデルによっては多言語翻訳にも対応
 - MLX モデルの自動利用
 - 常駐サーバーで起動コストを削減
 - 対話モード（引数なしで起動すると REPL）
@@ -124,6 +125,10 @@ uv run neko-translate-pdf paper.pdf --output-dir ./out
 - `hotchpotch/CAT-Translate-0.8b-mlx-q8`
 - `hotchpotch/CAT-Translate-1.4b-mlx-q4`
 - `hotchpotch/CAT-Translate-1.4b-mlx-q8`
+- `mlx-community/HY-MT1.5-1.8B-4bit`
+- `mlx-community/HY-MT1.5-1.8B-8bit`
+- `mlx-community/HY-MT1.5-7B-4bit`
+- `mlx-community/HY-MT1.5-7B-8bit`
 
 例:
 
@@ -134,6 +139,12 @@ uv run neko-translate --model hotchpotch/CAT-Translate-1.4b-mlx-q8 --text "こ�
 PDF 翻訳 (`neko-translate-pdf`) のデフォルトは以下です。
 
 - `hotchpotch/CAT-Translate-1.4b-mlx-q8`
+
+HY-MT 系を使いたい場合は `--model` で指定してください。例:
+
+```bash
+uv run neko-translate --model mlx-community/HY-MT1.5-1.8B-8bit --text "Hello"
+```
 
 ## オプション
 

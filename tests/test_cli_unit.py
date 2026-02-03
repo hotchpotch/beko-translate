@@ -43,6 +43,18 @@ def test_resolve_languages_rejects_same_language() -> None:
         cli.resolve_languages(args, "hello")
 
 
+def test_resolve_languages_requires_output_for_non_default_input() -> None:
+    args = make_args(input_lang="fr", output_lang=None, verbose=False)
+    with pytest.raises(SystemExit):
+        cli.resolve_languages(args, "bonjour")
+
+
+def test_resolve_languages_requires_input_for_non_default_output() -> None:
+    args = make_args(input_lang=None, output_lang="fr", verbose=False)
+    with pytest.raises(SystemExit):
+        cli.resolve_languages(args, "hello")
+
+
 def test_detect_lang_prefers_supported(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_detect(_: str, k: int = 3, model: str | None = None):
         return [
@@ -51,7 +63,7 @@ def test_detect_lang_prefers_supported(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
 
     monkeypatch.setattr("fast_langdetect.detect", fake_detect, raising=False)
-    assert cli.detect_lang("text") == "ja"
+    assert cli.detect_lang("text") == "fr"
 
 
 def test_detect_lang_handles_dict(monkeypatch: pytest.MonkeyPatch) -> None:

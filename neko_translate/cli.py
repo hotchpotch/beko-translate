@@ -32,6 +32,7 @@ DEFAULT_TOP_K = 0
 DEFAULT_NO_CHAT_TEMPLATE = False
 DEFAULT_NO_REPEAT_NGRAM = 4
 DEFAULT_NO_REPEAT_WINDOW = 128
+DEFAULT_REPETITION_PENALTY = 1.0
 STATUS_TIMEOUT = 120.0
 SERVER_LISTEN_BACKLOG = 16
 TRANSLATE_CONNECT_TIMEOUT = 1.0
@@ -47,8 +48,47 @@ LANG_CODE_MAP = {
     "en": "en",
     "eng": "en",
     "english": "en",
+    "zh": "zh",
+    "zh-cn": "zh",
+    "zh-hans": "zh",
+    "zh-hant": "zh-hant",
+    "zh-tw": "zh-hant",
+    "ko": "ko",
+    "ar": "ar",
+    "it": "it",
+    "id": "id",
+    "nl": "nl",
+    "es": "es",
+    "th": "th",
+    "de": "de",
+    "fr": "fr",
+    "vi": "vi",
+    "ru": "ru",
+    "pt": "pt",
+    "tr": "tr",
+    "ms": "ms",
+    "tl": "tl",
+    "hi": "hi",
+    "pl": "pl",
+    "cs": "cs",
+    "km": "km",
+    "my": "my",
+    "fa": "fa",
+    "gu": "gu",
+    "ur": "ur",
+    "te": "te",
+    "mr": "mr",
+    "he": "he",
+    "bn": "bn",
+    "ta": "ta",
+    "uk": "uk",
+    "bo": "bo",
+    "kk": "kk",
+    "mn": "mn",
+    "ug": "ug",
+    "yue": "yue",
 }
-SUPPORTED_LANGS = {"ja", "en"}
+SUPPORTED_LANGS = set(LANG_CODE_MAP.values())
 
 
 def build_translate_parser() -> argparse.ArgumentParser:
@@ -80,11 +120,11 @@ def build_translate_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--input-lang",
-        help="Input language (en/ja).",
+        help="Input language code (e.g. en/ja/zh).",
     )
     parser.add_argument(
         "--output-lang",
-        help="Output language (en/ja).",
+        help="Output language code (e.g. en/ja/zh).",
     )
     parser.add_argument(
         "--max-new-tokens",
@@ -118,6 +158,15 @@ def build_translate_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Sampling temperature. 0 disables sampling.",
+    )
+    parser.add_argument(
+        "--repetition-penalty",
+        type=float,
+        default=None,
+        help=(
+            "Penalty for repeating tokens "
+            f"(default: {DEFAULT_REPETITION_PENALTY})."
+        ),
     )
     parser.add_argument(
         "--top-p",
@@ -239,6 +288,15 @@ def build_server_parser() -> argparse.ArgumentParser:
         help="Sampling temperature. 0 disables sampling.",
     )
     parser.add_argument(
+        "--repetition-penalty",
+        type=float,
+        default=None,
+        help=(
+            "Penalty for repeating tokens "
+            f"(default: {DEFAULT_REPETITION_PENALTY})."
+        ),
+    )
+    parser.add_argument(
         "--top-p",
         type=float,
         default=None,
@@ -314,10 +372,13 @@ def detect_lang(text: str) -> str:
 
     for item in results_iter:
         lang = item.get("lang")
-        if isinstance(lang, str) and lang in SUPPORTED_LANGS:
-            return lang
+        if not isinstance(lang, str):
+            continue
+        normalized = LANG_CODE_MAP.get(lang.lower(), lang)
+        if normalized in SUPPORTED_LANGS:
+            return normalized
 
-    raise SystemExit("Could not detect language as English or Japanese.")
+    raise SystemExit("Could not detect language.")
 
 
 def resolve_languages(args: argparse.Namespace, text: str) -> tuple[str, str]:
@@ -326,21 +387,35 @@ def resolve_languages(args: argparse.Namespace, text: str) -> tuple[str, str]:
 
     if input_lang is None and output_lang is None:
         input_lang = detect_lang(text)
-        output_lang = "ja" if input_lang == "en" else "en"
+        if input_lang == "en":
+            output_lang = "ja"
+        elif input_lang == "ja":
+            output_lang = "en"
+        else:
+            raise SystemExit(
+                "Specify --output-lang when input language is not en/ja."
+            )
         if getattr(args, "verbose", False):
             sys.stderr.write(f"[INFO] Detected {input_lang} -> {output_lang}\n")
         return input_lang, output_lang
 
     if input_lang is None and output_lang is not None:
-        input_lang = "ja" if output_lang == "en" else "en"
-        return input_lang, output_lang
+        if output_lang == "en":
+            input_lang = "ja"
+            return input_lang, output_lang
+        if output_lang == "ja":
+            input_lang = "en"
+            return input_lang, output_lang
+        raise SystemExit("Specify --input-lang when output language is not en/ja.")
 
     if input_lang is not None and output_lang is None:
-        output_lang = "ja" if input_lang == "en" else "en"
-        return input_lang, output_lang
-
-    if input_lang not in SUPPORTED_LANGS or output_lang not in SUPPORTED_LANGS:
-        raise SystemExit("Only English and Japanese are supported.")
+        if input_lang == "en":
+            output_lang = "ja"
+            return input_lang, output_lang
+        if input_lang == "ja":
+            output_lang = "en"
+            return input_lang, output_lang
+        raise SystemExit("Specify --output-lang when input language is not en/ja.")
 
     if input_lang == output_lang:
         raise SystemExit("Input and output languages must be different.")
@@ -488,6 +563,7 @@ def _resolve_generation_args(
         defaults = translator.default_generation()
     max_new_tokens = getattr(args, "max_new_tokens", None)
     temperature = getattr(args, "temperature", None)
+    repetition_penalty = getattr(args, "repetition_penalty", None)
     top_p = getattr(args, "top_p", None)
     top_k = getattr(args, "top_k", None)
     no_chat_template = getattr(args, "no_chat_template", None)
@@ -503,6 +579,11 @@ def _resolve_generation_args(
             defaults.get("temperature", DEFAULT_TEMPERATURE)
             if temperature is None
             else temperature
+        ),
+        "repetition_penalty": (
+            defaults.get("repetition_penalty", DEFAULT_REPETITION_PENALTY)
+            if repetition_penalty is None
+            else repetition_penalty
         ),
         "top_p": (
             defaults.get("top_p", DEFAULT_TOP_P) if top_p is None else top_p
@@ -532,6 +613,7 @@ def _build_request_overrides(args: argparse.Namespace) -> dict[str, Any]:
     payload: dict[str, Any] = {}
     max_new_tokens = getattr(args, "max_new_tokens", None)
     temperature = getattr(args, "temperature", None)
+    repetition_penalty = getattr(args, "repetition_penalty", None)
     top_p = getattr(args, "top_p", None)
     top_k = getattr(args, "top_k", None)
     no_chat_template = getattr(args, "no_chat_template", None)
@@ -541,6 +623,8 @@ def _build_request_overrides(args: argparse.Namespace) -> dict[str, Any]:
         payload["max_new_tokens"] = max_new_tokens
     if temperature is not None:
         payload["temperature"] = temperature
+    if repetition_penalty is not None:
+        payload["repetition_penalty"] = repetition_penalty
     if top_p is not None:
         payload["top_p"] = top_p
     if top_k is not None:
@@ -575,6 +659,7 @@ def _generate_text(
     *,
     max_new_tokens: int,
     temperature: float,
+    repetition_penalty: float,
     top_p: float,
     top_k: int,
     no_repeat_ngram: int,
@@ -606,6 +691,7 @@ def _generate_text(
     logits_processors = _build_logits_processors(
         no_repeat_ngram=no_repeat_ngram,
         no_repeat_window=no_repeat_window,
+        repetition_penalty=repetition_penalty,
     )
     if logits_processors:
         gen_kwargs["logits_processors"] = logits_processors
@@ -619,6 +705,7 @@ def _stream_text(
     *,
     max_new_tokens: int,
     temperature: float,
+    repetition_penalty: float,
     top_p: float,
     top_k: int,
     no_repeat_ngram: int,
@@ -650,6 +737,7 @@ def _stream_text(
     logits_processors = _build_logits_processors(
         no_repeat_ngram=no_repeat_ngram,
         no_repeat_window=no_repeat_window,
+        repetition_penalty=repetition_penalty,
     )
     if logits_processors:
         gen_kwargs["logits_processors"] = logits_processors
@@ -718,12 +806,20 @@ def _build_logits_processors(
     *,
     no_repeat_ngram: int,
     no_repeat_window: int,
+    repetition_penalty: float,
 ) -> list[Any]:
     processors: list[Any] = []
     if no_repeat_ngram and no_repeat_ngram > 1:
         processors.append(
             _make_no_repeat_ngram_processor(
                 ngram_size=no_repeat_ngram,
+                window_size=no_repeat_window,
+            )
+        )
+    if repetition_penalty and repetition_penalty > 1.0:
+        processors.append(
+            _make_repetition_penalty_processor(
+                penalty=repetition_penalty,
                 window_size=no_repeat_window,
             )
         )
@@ -754,6 +850,30 @@ def _make_no_repeat_ngram_processor(ngram_size: int, window_size: int):
             return logits
         banned_list = list(banned)
         logits[:, banned_list] = mx.array(-float("inf"), logits.dtype)
+        return logits
+
+    return processor
+
+
+def _make_repetition_penalty_processor(penalty: float, window_size: int):
+    import mlx.core as mx
+
+    penalty = float(penalty)
+    window_size = int(window_size) if window_size else 0
+
+    def processor(tokens, logits):
+        if len(tokens) == 0:
+            return logits
+        token_list = tokens.tolist()
+        if window_size > 0:
+            token_list = token_list[-window_size:]
+        if not token_list:
+            return logits
+        for token_id in set(token_list):
+            values = logits[:, token_id]
+            logits[:, token_id] = mx.where(
+                values < 0, values * penalty, values / penalty
+            )
         return logits
 
     return processor
@@ -886,6 +1006,7 @@ def _start_server(
     verbose: bool,
     max_new_tokens: int,
     temperature: float,
+    repetition_penalty: float,
     top_p: float,
     top_k: int,
     no_chat_template: bool,
@@ -915,6 +1036,8 @@ def _start_server(
         str(max_new_tokens),
         "--temperature",
         str(temperature),
+        "--repetition-penalty",
+        str(repetition_penalty),
         "--top-p",
         str(top_p),
         "--top-k",
@@ -956,6 +1079,7 @@ def run_mlx(text: str, src_lang: str, tgt_lang: str, args: argparse.Namespace) -
         prompt,
         max_new_tokens=gen_args["max_new_tokens"],
         temperature=gen_args["temperature"],
+        repetition_penalty=gen_args["repetition_penalty"],
         top_p=gen_args["top_p"],
         top_k=gen_args["top_k"],
         no_repeat_ngram=gen_args["no_repeat_ngram"],
@@ -1013,6 +1137,9 @@ def _handle_request(
         prompt = request.get("prompt")
         max_new_tokens = request.get("max_new_tokens", defaults["max_new_tokens"])
         temperature = request.get("temperature", defaults["temperature"])
+        repetition_penalty = request.get(
+            "repetition_penalty", defaults["repetition_penalty"]
+        )
         top_p = request.get("top_p", defaults["top_p"])
         top_k = request.get("top_k", defaults["top_k"])
         no_repeat_ngram = request.get(
@@ -1063,6 +1190,7 @@ def _handle_request(
                 "max_new_tokens": int(max_new_tokens),
                 "max_kv_size": max_kv_size,
                 "temperature": float(temperature),
+                "repetition_penalty": float(repetition_penalty),
                 "top_p": float(top_p),
                 "top_k": int(top_k),
                 "no_repeat_ngram": int(no_repeat_ngram),
@@ -1078,6 +1206,7 @@ def _handle_request(
                 prompt_input,
                 max_new_tokens=int(max_new_tokens),
                 temperature=float(temperature),
+                repetition_penalty=float(repetition_penalty),
                 top_p=float(top_p),
                 top_k=int(top_k),
                 no_repeat_ngram=int(no_repeat_ngram),
@@ -1265,6 +1394,7 @@ def _server_start(args: argparse.Namespace) -> int:
         verbose=args.verbose,
         max_new_tokens=defaults["max_new_tokens"],
         temperature=defaults["temperature"],
+        repetition_penalty=defaults["repetition_penalty"],
         top_p=defaults["top_p"],
         top_k=defaults["top_k"],
         no_chat_template=defaults["no_chat_template"],
@@ -1489,6 +1619,7 @@ def _translate_text(
             verbose=args.verbose,
             max_new_tokens=gen_args["max_new_tokens"],
             temperature=gen_args["temperature"],
+            repetition_penalty=gen_args["repetition_penalty"],
             top_p=gen_args["top_p"],
             top_k=gen_args["top_k"],
             no_chat_template=gen_args["no_chat_template"],
@@ -1529,6 +1660,7 @@ def _translate_text(
                 prompt,
                 max_new_tokens=gen_args["max_new_tokens"],
                 temperature=gen_args["temperature"],
+                repetition_penalty=gen_args["repetition_penalty"],
                 top_p=gen_args["top_p"],
                 top_k=gen_args["top_k"],
                 no_repeat_ngram=gen_args["no_repeat_ngram"],
@@ -1541,6 +1673,7 @@ def _translate_text(
                 prompt,
                 max_new_tokens=gen_args["max_new_tokens"],
                 temperature=gen_args["temperature"],
+                repetition_penalty=gen_args["repetition_penalty"],
                 top_p=gen_args["top_p"],
                 top_k=gen_args["top_k"],
                 no_repeat_ngram=gen_args["no_repeat_ngram"],

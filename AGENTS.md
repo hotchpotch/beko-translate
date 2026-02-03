@@ -42,6 +42,10 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
   - `hotchpotch/CAT-Translate-0.8b-mlx-q8`
   - `hotchpotch/CAT-Translate-1.4b-mlx-q4`
   - `hotchpotch/CAT-Translate-1.4b-mlx-q8`
+  - `mlx-community/HY-MT1.5-1.8B-4bit`
+  - `mlx-community/HY-MT1.5-1.8B-8bit`
+  - `mlx-community/HY-MT1.5-7B-4bit`
+  - `mlx-community/HY-MT1.5-7B-8bit`
 
 ## Notes
 - `neko-translate` supports `--text` or stdin input.
@@ -60,6 +64,8 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
   - en->ja, model `hotchpotch/CAT-Translate-1.4b-mlx-q8`
   - max-new-tokens=1024
   - pdf2zh args include `--qps 4`
+- If `neko-translate-pdf` starts a server itself, it will stop it after the
+  translations finish. Existing servers are left running.
 - Server uses a Unix domain socket under `~/.config/neko-translate/` with
   `neko-translate.sock` and `server.log` by default. Override with
   `--socket/--log-file` or `NEKO_TRANSLATE_SOCKET/NEKO_TRANSLATE_LOG`.

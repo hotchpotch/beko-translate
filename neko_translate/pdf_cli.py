@@ -132,6 +132,12 @@ def parse_args() -> argparse.Namespace:
         help="Sampling temperature. 0 disables sampling.",
     )
     parser.add_argument(
+        "--repetition-penalty",
+        type=float,
+        default=neko_cli.DEFAULT_REPETITION_PENALTY,
+        help="Penalty for repeating tokens.",
+    )
+    parser.add_argument(
         "--top-p",
         type=float,
         default=neko_cli.DEFAULT_TOP_P,
@@ -450,10 +456,11 @@ def ensure_neko_translate_server(
     verbose: bool,
     max_new_tokens: int,
     temperature: float,
+    repetition_penalty: float,
     top_p: float,
     top_k: int,
     no_chat_template: bool,
-) -> None:
+) -> bool:
     state_path = neko_cli.resolve_state_path(None)
     status = neko_cli._get_server_status(socket_path, state_path=state_path)
     if status and status.get("model") != model:
@@ -470,7 +477,7 @@ def ensure_neko_translate_server(
     if status:
         if verbose:
             sys.stderr.write(f"[INFO] Using existing server (model={status.get('model')}).\n")
-        return
+        return False
 
     started = neko_cli._start_server(
         model=model,
@@ -481,6 +488,7 @@ def ensure_neko_translate_server(
         verbose=verbose,
         max_new_tokens=max_new_tokens,
         temperature=temperature,
+        repetition_penalty=repetition_penalty,
         top_p=top_p,
         top_k=top_k,
         no_chat_template=no_chat_template,
@@ -491,6 +499,7 @@ def ensure_neko_translate_server(
         sys.stderr.write(
             f"[INFO] Server started (model={started.get('model')}, socket={socket_path}).\n"
         )
+    return True
 
 
 def detect_pdf_language(pdf_path: Path) -> str:
@@ -603,8 +612,9 @@ def main() -> int:
 
     model = resolve_model_alias(args.model, DEFAULT_MODEL)
 
+    started_server = False
     if not args.dry_run:
-        ensure_neko_translate_server(
+        started_server = ensure_neko_translate_server(
             model=model,
             socket_path=socket_path,
             log_path=log_path,
@@ -612,6 +622,7 @@ def main() -> int:
             verbose=args.verbose,
             max_new_tokens=args.max_new_tokens,
             temperature=args.temperature,
+            repetition_penalty=args.repetition_penalty,
             top_p=args.top_p,
             top_k=args.top_k,
             no_chat_template=args.no_chat_template,
@@ -625,81 +636,91 @@ def main() -> int:
     planned: List[Tuple[Path, Path, str]] = []
     same_lang: List[Tuple[Path, str]] = []
 
-    for pdf_path, base_raw, base_clean in targets:
-        lang_in = input_lang
-        lang_out = output_lang
-        if lang_in == "auto":
-            lang_in = detect_pdf_language(pdf_path)
-        if lang_in == lang_out:
-            sys.stderr.write(
-                f"[skip] {pdf_path.name}: input and output are both '{lang_in}'.\n"
+    try:
+        for pdf_path, base_raw, base_clean in targets:
+            lang_in = input_lang
+            lang_out = output_lang
+            if lang_in == "auto":
+                lang_in = detect_pdf_language(pdf_path)
+            if lang_in == lang_out:
+                sys.stderr.write(
+                    f"[skip] {pdf_path.name}: input and output are both '{lang_in}'.\n"
+                )
+                same_lang.append((pdf_path, lang_in))
+                continue
+
+            output_code = "ja" if lang_out == "ja" else "en"
+
+            if args.output_pdf:
+                dest = args.output_pdf.expanduser()
+                dest_dir = dest.parent
+                dest_name = dest.name
+            else:
+                dest_dir = (
+                    args.output_dir.expanduser() if args.output_dir else pdf_path.parent
+                )
+                dest_name = f"{base_clean}.{output_code}.pdf"
+                dest = dest_dir / dest_name
+
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            if dest.exists() and not args.force:
+                print(f"[skip] {dest.name} already exists.")
+                skipped.append((pdf_path, dest))
+                continue
+
+            if dest.exists():
+                print(f"[retranslate] Overwriting {dest.name}.")
+
+            cli_command = build_neko_translate_command(
+                model=model,
+                socket_path=socket_path,
+                log_path=log_path,
+                lang_in=lang_in,
+                lang_out=lang_out,
+                trust_remote_code=args.trust_remote_code,
+                no_chat_template=args.no_chat_template,
             )
-            same_lang.append((pdf_path, lang_in))
-            continue
+            pdf2zh_args = build_pdf2zh_args(
+                pdf2zh_base_args,
+                lang_in=lang_in,
+                lang_out=lang_out,
+                cli_command=cli_command,
+            )
 
-        output_code = "ja" if lang_out == "ja" else "en"
+            cmd = (
+                shlex.split(PDF2ZH_COMMAND)
+                + pdf2zh_args
+                + ["--output", str(dest_dir), str(pdf_path)]
+            )
+            cmd_display = " ".join(shlex.quote(part) for part in cmd)
 
-        if args.output_pdf:
-            dest = args.output_pdf.expanduser()
-            dest_dir = dest.parent
-            dest_name = dest.name
-        else:
-            dest_dir = args.output_dir.expanduser() if args.output_dir else pdf_path.parent
-            dest_name = f"{base_clean}.{output_code}.pdf"
-            dest = dest_dir / dest_name
+            if args.dry_run:
+                print(f"[dry-run] {cmd_display}")
+                planned.append((pdf_path, dest, cmd_display))
+                continue
 
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
-        if dest.exists() and not args.force:
-            print(f"[skip] {dest.name} already exists.")
-            skipped.append((pdf_path, dest))
-            continue
-
-        if dest.exists():
-            print(f"[retranslate] Overwriting {dest.name}.")
-
-        cli_command = build_neko_translate_command(
-            model=model,
-            socket_path=socket_path,
-            log_path=log_path,
-            lang_in=lang_in,
-            lang_out=lang_out,
-            trust_remote_code=args.trust_remote_code,
-            no_chat_template=args.no_chat_template,
-        )
-        pdf2zh_args = build_pdf2zh_args(
-            pdf2zh_base_args,
-            lang_in=lang_in,
-            lang_out=lang_out,
-            cli_command=cli_command,
-        )
-
-        cmd = (
-            shlex.split(PDF2ZH_COMMAND)
-            + pdf2zh_args
-            + ["--output", str(dest_dir), str(pdf_path)]
-        )
-        cmd_display = " ".join(shlex.quote(part) for part in cmd)
-
-        if args.dry_run:
-            print(f"[dry-run] {cmd_display}")
-            planned.append((pdf_path, dest, cmd_display))
-            continue
-
-        success = translate_pdf(
-            pdf_path,
-            dest_dir,
-            dest,
-            base_raw,
-            base_clean,
-            pdf2zh_args,
-        )
-        if success:
-            print(f"[done] {dest}")
-            translated.append((pdf_path, dest))
-        else:
-            print(f"[fail] {pdf_path.name}")
-            failed.append(pdf_path)
+            success = translate_pdf(
+                pdf_path,
+                dest_dir,
+                dest,
+                base_raw,
+                base_clean,
+                pdf2zh_args,
+            )
+            if success:
+                print(f"[done] {dest}")
+                translated.append((pdf_path, dest))
+            else:
+                print(f"[fail] {pdf_path.name}")
+                failed.append(pdf_path)
+    finally:
+        if started_server:
+            response = neko_cli._send_request(
+                socket_path, {"type": "stop"}, timeout=2.0
+            )
+            if not response or not response.get("ok"):
+                sys.stderr.write("[WARN] Failed to stop neko-translate server.\n")
 
     print("\nSummary:")
     if args.dry_run:
