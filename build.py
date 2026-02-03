@@ -106,7 +106,7 @@ def release(pyproject_path: Path, log_path: Path, ignore_git_warnings: bool) -> 
     token = os.environ.get("PYPI_TOKEN")
     if not token:
         raise RuntimeError("PYPI_TOKEN is not set.")
-    run(["uv", "run", "--extra", "dev", "tox"])
+    run(["uv", "run", "--group", "dev", "tox"])
     dist_path = Path("dist")
     clean_dist(dist_path)
     run(["uv", "build"])
