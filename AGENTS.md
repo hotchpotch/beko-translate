@@ -47,4 +47,19 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
 - `neko-translate` supports `--text` or stdin input.
 - If `--input-lang` and `--output-lang` are omitted, `fast-langdetect` is used to
   detect English/Japanese (k=3) and infer the direction.
-- `neko-translate-pdf` defaults to en->ja and uses `hotchpotch/CAT-Translate-1.4b-mlx-q8`.
+- `neko-translate` defaults:
+  - model: `hotchpotch/CAT-Translate-0.8b-mlx-q4`
+  - sampling: temperature=0.0, top_p=0.98, top_k=0
+  - no-repeat: ngram=4, window=128
+  - trust remote code: enabled by default
+  - KV cache: `max_kv_size = prompt_tokens + max_new_tokens` (auto)
+- Model aliases:
+  - `cat` -> `hotchpotch/CAT-Translate-1.8b-mlx-q8`
+  - `plamo` -> `mlx-community/plamo-2-translate`
+- `neko-translate-pdf` defaults:
+  - en->ja, model `hotchpotch/CAT-Translate-1.4b-mlx-q8`
+  - max-new-tokens=1024
+  - pdf2zh args include `--qps 4`
+- Server uses a Unix domain socket under `~/.config/neko-translate/` with
+  `neko-translate.sock` and `server.log` by default. Override with
+  `--socket/--log-file` or `NEKO_TRANSLATE_SOCKET/NEKO_TRANSLATE_LOG`.

@@ -507,7 +507,7 @@ def detect_pdf_language(pdf_path: Path) -> str:
 
     for item in results_iter:
         lang = item.get("lang")
-        if lang in {"en", "ja"}:
+        if isinstance(lang, str) and lang in {"en", "ja"}:
             return lang
     raise SystemExit(f"Could not detect English/Japanese for: {pdf_path}")
 

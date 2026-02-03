@@ -554,10 +554,24 @@ def _build_request_overrides(args: argparse.Namespace) -> dict[str, Any]:
     return payload
 
 
+def _prepare_prompt_for_generation(
+    tokenizer: Any, prompt: str | list[int], max_new_tokens: int
+) -> tuple[str | list[int], int | None, int | None]:
+    if isinstance(prompt, list):
+        prompt_len = len(prompt)
+        return prompt, prompt_len, prompt_len + max_new_tokens
+    try:
+        prompt_tokens = tokenizer.encode(prompt)
+    except Exception:
+        return prompt, None, None
+    prompt_len = len(prompt_tokens)
+    return prompt_tokens, prompt_len, prompt_len + max_new_tokens
+
+
 def _generate_text(
     model: Any,
     tokenizer: Any,
-    prompt: str,
+    prompt: str | list[int],
     *,
     max_new_tokens: int,
     temperature: float,
@@ -569,7 +583,9 @@ def _generate_text(
     from mlx_lm.generate import generate
     from mlx_lm.sample_utils import make_sampler
 
-    prompt_text = prompt
+    prompt_text, _prompt_len, max_kv_size = _prepare_prompt_for_generation(
+        tokenizer, prompt, max_new_tokens
+    )
     sampler = None
     if (
         (temperature and temperature > 0)
@@ -583,6 +599,8 @@ def _generate_text(
         )
 
     gen_kwargs: dict[str, Any] = {"max_tokens": max_new_tokens}
+    if max_kv_size:
+        gen_kwargs["max_kv_size"] = max_kv_size
     if sampler is not None:
         gen_kwargs["sampler"] = sampler
     logits_processors = _build_logits_processors(
@@ -597,7 +615,7 @@ def _generate_text(
 def _stream_text(
     model: Any,
     tokenizer: Any,
-    prompt: str,
+    prompt: str | list[int],
     *,
     max_new_tokens: int,
     temperature: float,
@@ -609,7 +627,9 @@ def _stream_text(
     from mlx_lm.generate import stream_generate
     from mlx_lm.sample_utils import make_sampler
 
-    prompt_text = prompt
+    prompt_text, _prompt_len, max_kv_size = _prepare_prompt_for_generation(
+        tokenizer, prompt, max_new_tokens
+    )
     sampler = None
     if (
         (temperature and temperature > 0)
@@ -623,6 +643,8 @@ def _stream_text(
         )
 
     gen_kwargs: dict[str, Any] = {"max_tokens": max_new_tokens}
+    if max_kv_size:
+        gen_kwargs["max_kv_size"] = max_kv_size
     if sampler is not None:
         gen_kwargs["sampler"] = sampler
     logits_processors = _build_logits_processors(
@@ -1024,6 +1046,9 @@ def _handle_request(
                 response = {"ok": False, "error": "invalid_prompt"}
                 _write_response(file, response)
                 return False
+        prompt_input, prompt_tokens_len, max_kv_size = _prepare_prompt_for_generation(
+            tokenizer, prompt, int(max_new_tokens)
+        )
         _log_server_event(
             "translate_start",
             {
@@ -1033,8 +1058,10 @@ def _handle_request(
                 "tgt_lang": tgt_lang,
                 "text_head": _log_snippet(text) if isinstance(text, str) else "",
                 "prompt_len": len(prompt),
+                "prompt_tokens": prompt_tokens_len,
                 "prompt_head": _log_snippet(prompt),
                 "max_new_tokens": int(max_new_tokens),
+                "max_kv_size": max_kv_size,
                 "temperature": float(temperature),
                 "top_p": float(top_p),
                 "top_k": int(top_k),
@@ -1048,7 +1075,7 @@ def _handle_request(
             text = _generate_text(
                 model,
                 tokenizer,
-                prompt,
+                prompt_input,
                 max_new_tokens=int(max_new_tokens),
                 temperature=float(temperature),
                 top_p=float(top_p),
