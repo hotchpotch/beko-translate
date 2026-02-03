@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import functools
+import os
 import sys
-from typing import Any, Iterable
+import tempfile
+import warnings
+from typing import Any, Iterable, Iterator
 
 PROMPT_TEMPLATE = "Translate the following {src_lang} text into {tgt_lang}.\n\n{src_text}"
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
@@ -82,6 +87,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable chat template even if the tokenizer provides one.",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging and download progress output.",
+    )
     return parser.parse_args()
 
 
@@ -132,7 +142,8 @@ def resolve_languages(args: argparse.Namespace, text: str) -> tuple[str, str]:
     if input_lang is None and output_lang is None:
         input_lang = detect_lang(text)
         output_lang = "ja" if input_lang == "en" else "en"
-        sys.stderr.write(f"[INFO] Detected {input_lang} -> {output_lang}\n")
+        if getattr(args, "verbose", False):
+            sys.stderr.write(f"[INFO] Detected {input_lang} -> {output_lang}\n")
         return input_lang, output_lang
 
     if input_lang is None and output_lang is not None:
@@ -152,17 +163,68 @@ def resolve_languages(args: argparse.Namespace, text: str) -> tuple[str, str]:
     return input_lang, output_lang
 
 
-def run_mlx(prompt: str, args: argparse.Namespace) -> str:
+@functools.lru_cache(maxsize=4)
+def _load_model(model: str, trust_remote_code: bool):
     from mlx_lm import load
+
+    return load(
+        model,
+        tokenizer_config={
+            "trust_remote_code": True if trust_remote_code else None
+        },
+    )
+
+
+def configure_logging(verbose: bool) -> None:
+    if verbose:
+        return
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    try:
+        from huggingface_hub.utils import logging as hf_logging
+
+        hf_logging.set_verbosity_error()
+        disable = getattr(hf_logging, "disable_progress_bars", None)
+        if callable(disable):
+            disable()
+    except Exception:
+        pass
+    warnings.filterwarnings(
+        "ignore",
+        message=r"(?s).*mx\\.metal\\.device_info.*",
+    )
+
+
+@contextlib.contextmanager
+def silence_stderr(enabled: bool) -> Iterator[None]:
+    if not enabled:
+        yield
+        return
+
+    original_fd = os.dup(2)
+    try:
+        with tempfile.TemporaryFile(mode="w+b") as tmp:
+            os.dup2(tmp.fileno(), 2)
+            try:
+                yield
+            except Exception:
+                os.dup2(original_fd, 2)
+                tmp.seek(0)
+                data = tmp.read()
+                if data:
+                    sys.stderr.write(data.decode(errors="replace"))
+                raise
+            finally:
+                os.dup2(original_fd, 2)
+    finally:
+        os.close(original_fd)
+
+
+def run_mlx(prompt: str, args: argparse.Namespace) -> str:
     from mlx_lm.generate import generate
     from mlx_lm.sample_utils import make_sampler
 
-    loaded = load(
-        args.model,
-        tokenizer_config={
-            "trust_remote_code": True if args.trust_remote_code else None
-        },
-    )
+    loaded = _load_model(args.model, args.trust_remote_code)
     model = loaded[0]
     tokenizer = loaded[1]
 
@@ -195,6 +257,7 @@ def run_mlx(prompt: str, args: argparse.Namespace) -> str:
 
 def main() -> int:
     args = parse_args()
+    configure_logging(args.verbose)
     text = read_text(args)
     input_lang, output_lang = resolve_languages(args, text)
 
@@ -204,7 +267,8 @@ def main() -> int:
         src_text=text,
     )
 
-    translation = run_mlx(prompt, args)
+    with silence_stderr(not args.verbose):
+        translation = run_mlx(prompt, args)
     print(translation)
     return 0
 

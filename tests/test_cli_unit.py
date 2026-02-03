@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import types
+import argparse
 
 import pytest
 
 import cat_translate.cli as cli
 
-
-class Args(types.SimpleNamespace):
-    pass
+def make_args(**kwargs):
+    return argparse.Namespace(**kwargs)
 
 
 def test_read_text_from_arg() -> None:
-    args = Args(text="hello")
+    args = make_args(text="hello")
     assert cli.read_text(args) == "hello"
 
 
@@ -21,25 +20,25 @@ def test_resolve_languages_detects_when_missing(monkeypatch: pytest.MonkeyPatch)
         return "en"
 
     monkeypatch.setattr(cli, "detect_lang", fake_detect)
-    args = Args(input_lang=None, output_lang=None)
+    args = make_args(input_lang=None, output_lang=None, verbose=False)
     src, tgt = cli.resolve_languages(args, "hello")
     assert (src, tgt) == ("en", "ja")
 
 
 def test_resolve_languages_infers_from_input() -> None:
-    args = Args(input_lang="en", output_lang=None)
+    args = make_args(input_lang="en", output_lang=None, verbose=False)
     src, tgt = cli.resolve_languages(args, "hello")
     assert (src, tgt) == ("en", "ja")
 
 
 def test_resolve_languages_infers_from_output() -> None:
-    args = Args(input_lang=None, output_lang="ja")
+    args = make_args(input_lang=None, output_lang="ja", verbose=False)
     src, tgt = cli.resolve_languages(args, "hello")
     assert (src, tgt) == ("en", "ja")
 
 
 def test_resolve_languages_rejects_same_language() -> None:
-    args = Args(input_lang="en", output_lang="en")
+    args = make_args(input_lang="en", output_lang="en", verbose=False)
     with pytest.raises(SystemExit):
         cli.resolve_languages(args, "hello")
 
