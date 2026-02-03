@@ -1,3 +1,7 @@
-from .cli import main
+def main() -> int:
+    from .cli import main as _main
+
+    return _main()
+
 
 __all__ = ["main"]

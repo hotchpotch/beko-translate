@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 import warnings
+import itertools
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
@@ -20,6 +21,7 @@ PROMPT_TEMPLATE = "Translate the following {src_lang} text into {tgt_lang}.\n\n{
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
 DEFAULT_SOCKET_NAME = "cat-translate.sock"
 DEFAULT_LOG_NAME = "server.log"
+DEFAULT_STATE_NAME = "server.json"
 SERVER_MODES = ("auto", "always", "never")
 DEFAULT_SERVER_MODE = "auto"
 DEFAULT_CONFIG_DIR = Path("~/.config/cat-translate").expanduser()
@@ -28,6 +30,13 @@ DEFAULT_TEMPERATURE = 0.0
 DEFAULT_TOP_P = 1.0
 DEFAULT_TOP_K = 0
 DEFAULT_NO_CHAT_TEMPLATE = False
+STATUS_TIMEOUT = 120.0
+SERVER_LISTEN_BACKLOG = 16
+TRANSLATE_CONNECT_TIMEOUT = 1.0
+TRANSLATE_CONNECT_DEADLINE = 120.0
+TRANSLATE_CONNECT_SLEEP = 0.2
+LOG_SNIPPET_LIMIT = 20
+_REQUEST_COUNTER = itertools.count(1)
 LANG_CODE_MAP = {
     "ja": "ja",
     "jp": "ja",
@@ -317,6 +326,7 @@ def _load_model(model: str, trust_remote_code: bool):
 
 
 def configure_logging(verbose: bool) -> None:
+    _patch_mx_device_info()
     if verbose:
         return
     os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
@@ -334,6 +344,21 @@ def configure_logging(verbose: bool) -> None:
         "ignore",
         message=r"(?s).*mx\\.metal\\.device_info.*",
     )
+
+
+def _patch_mx_device_info() -> None:
+    try:
+        import mlx.core as mx
+    except Exception:
+        return
+    try:
+        metal = getattr(mx, "metal", None)
+        device_info = getattr(mx, "device_info", None)
+        if metal is None or device_info is None:
+            return
+        setattr(metal, "device_info", device_info)
+    except Exception:
+        return
 
 
 @contextlib.contextmanager
@@ -385,6 +410,15 @@ def resolve_log_path(value: str | None) -> Path:
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_LOG_NAME
+
+
+def resolve_state_path(value: str | None) -> Path:
+    if value:
+        return Path(value).expanduser()
+    env = os.environ.get("CAT_TRANSLATE_STATE")
+    if env:
+        return Path(env).expanduser()
+    return DEFAULT_CONFIG_DIR / DEFAULT_STATE_NAME
 
 
 def _prepare_prompt(tokenizer: Any, prompt: str, no_chat_template: bool) -> str:
@@ -532,8 +566,114 @@ def _send_request(
         return json.loads(line.decode("utf-8"))
 
 
-def _get_server_status(socket_path: Path) -> dict[str, Any] | None:
-    response = _send_request(socket_path, {"type": "status"}, timeout=1.0)
+def _send_request_with_connect_timeout(
+    socket_path: Path, payload: dict[str, Any], *, connect_timeout: float
+) -> dict[str, Any] | None:
+    try:
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.settimeout(connect_timeout)
+        sock.connect(str(socket_path))
+    except OSError:
+        return None
+
+    with sock:
+        try:
+            sock.settimeout(None)
+            file = sock.makefile("rwb")
+            data = json.dumps(payload).encode("utf-8") + b"\n"
+            file.write(data)
+            file.flush()
+            line = file.readline()
+        except (OSError, TimeoutError):
+            return None
+        if not line:
+            return None
+        return json.loads(line.decode("utf-8"))
+
+
+def _read_state(state_path: Path) -> dict[str, Any] | None:
+    try:
+        data = state_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return None
+    try:
+        return json.loads(data)
+    except json.JSONDecodeError:
+        return None
+
+
+def _write_state(state_path: Path, state: dict[str, Any]) -> None:
+    try:
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+    except OSError:
+        return
+
+
+def _remove_path(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+
+
+def _is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _cleanup_stale_resources(socket_path: Path, state_path: Path) -> None:
+    state = _read_state(state_path)
+    pid = None
+    if isinstance(state, dict):
+        pid = state.get("pid")
+    if isinstance(pid, int) and _is_pid_alive(pid):
+        return
+    if pid is None and socket_path.exists():
+        sock: socket.socket | None = None
+        try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.settimeout(0.2)
+            sock.connect(str(socket_path))
+        except OSError:
+            pass
+        else:
+            return
+        finally:
+            if sock is not None:
+                with contextlib.suppress(OSError):
+                    sock.close()
+    _remove_path(socket_path)
+    _remove_path(state_path)
+
+
+def _get_server_status(
+    socket_path: Path,
+    *,
+    state_path: Path | None = None,
+    timeout: float = STATUS_TIMEOUT,
+) -> dict[str, Any] | None:
+    if state_path is not None:
+        state = _read_state(state_path)
+        if isinstance(state, dict):
+            pid = state.get("pid")
+            if isinstance(pid, int) and _is_pid_alive(pid):
+                return {
+                    "ok": True,
+                    "pid": pid,
+                    "model": state.get("model"),
+                    "defaults": state.get("defaults"),
+                }
+            _cleanup_stale_resources(socket_path, state_path)
+    response = _send_request(socket_path, {"type": "status"}, timeout=timeout)
     if not response or not response.get("ok"):
         return None
     return response
@@ -548,10 +688,20 @@ def _remove_stale_socket(socket_path: Path) -> None:
         return
 
 
-def _wait_for_server(socket_path: Path, timeout: float = 60.0) -> dict[str, Any] | None:
+def _wait_for_server(
+    socket_path: Path,
+    *,
+    state_path: Path,
+    timeout: float = 60.0,
+    status_timeout: float = 1.0,
+) -> dict[str, Any] | None:
     start = time.time()
     while time.time() - start < timeout:
-        status = _get_server_status(socket_path)
+        status = _get_server_status(
+            socket_path,
+            state_path=state_path,
+            timeout=status_timeout,
+        )
         if status:
             return status
         time.sleep(0.2)
@@ -563,6 +713,7 @@ def _start_server(
     model: str,
     socket_path: Path,
     log_path: Path,
+    state_path: Path,
     trust_remote_code: bool,
     verbose: bool,
     max_new_tokens: int,
@@ -573,11 +724,12 @@ def _start_server(
 ) -> dict[str, Any] | None:
     ensure_directory(socket_path.parent)
     ensure_directory(log_path.parent)
-    if socket_path.exists():
-        status = _get_server_status(socket_path)
+    ensure_directory(state_path.parent)
+    if socket_path.exists() or state_path.exists():
+        status = _get_server_status(socket_path, state_path=state_path)
         if status:
             return status
-        _remove_stale_socket(socket_path)
+        _cleanup_stale_resources(socket_path, state_path)
 
     cmd = [
         sys.executable,
@@ -615,7 +767,7 @@ def _start_server(
             start_new_session=True,
         )
 
-    return _wait_for_server(socket_path)
+    return _wait_for_server(socket_path, state_path=state_path)
 
 
 def run_mlx(prompt: str, args: argparse.Namespace) -> str:
@@ -652,10 +804,15 @@ def _handle_request(
     except json.JSONDecodeError:
         response = {"ok": False, "error": "invalid_json"}
         _write_response(file, response)
+        _log_server_event(
+            "invalid_json",
+            {"raw": line.decode("utf-8", errors="replace")[:200]},
+        )
         return False
 
     req_type = request.get("type")
     if req_type == "status":
+        _log_server_event("status", {})
         response = {
             "ok": True,
             "pid": os.getpid(),
@@ -666,11 +823,13 @@ def _handle_request(
         return False
 
     if req_type == "stop":
+        _log_server_event("stop", {})
         response = {"ok": True}
         _write_response(file, response)
         return True
 
     if req_type == "translate":
+        request_id = next(_REQUEST_COUNTER)
         prompt = request.get("prompt", "")
         max_new_tokens = request.get("max_new_tokens", defaults["max_new_tokens"])
         temperature = request.get("temperature", defaults["temperature"])
@@ -679,9 +838,23 @@ def _handle_request(
         no_chat_template = request.get(
             "no_chat_template", defaults["no_chat_template"]
         )
-        response = {
-            "ok": True,
-            "text": _generate_text(
+        _log_server_event(
+            "translate_start",
+            {
+                "id": request_id,
+                "model": model_name,
+                "prompt_len": len(prompt),
+                "prompt_head": _log_snippet(prompt),
+                "max_new_tokens": int(max_new_tokens),
+                "temperature": float(temperature),
+                "top_p": float(top_p),
+                "top_k": int(top_k),
+                "no_chat_template": bool(no_chat_template),
+            },
+        )
+        start_time = time.time()
+        try:
+            text = _generate_text(
                 model,
                 tokenizer,
                 prompt,
@@ -690,13 +863,38 @@ def _handle_request(
                 top_p=float(top_p),
                 top_k=int(top_k),
                 no_chat_template=bool(no_chat_template),
-            ),
-        }
+            )
+        except Exception as exc:
+            duration = time.time() - start_time
+            _log_server_event(
+                "translate_error",
+                {
+                    "id": request_id,
+                    "duration_sec": round(duration, 3),
+                    "error": str(exc),
+                },
+            )
+            response = {"ok": False, "error": "translate_failed"}
+            _write_response(file, response)
+            return False
+
+        response = {"ok": True, "text": text}
+        duration = time.time() - start_time
+        _log_server_event(
+            "translate_done",
+            {
+                "id": request_id,
+                "duration_sec": round(duration, 3),
+                "output_len": len(text),
+                "output_head": _log_snippet(text),
+            },
+        )
         _write_response(file, response)
         return False
 
     response = {"ok": False, "error": "unknown_request"}
     _write_response(file, response)
+    _log_server_event("unknown_request", {"type": req_type})
     return False
 
 
@@ -708,26 +906,41 @@ def _write_response(file: Any, response: dict[str, Any]) -> None:
         return
 
 
+def _log_snippet(text: str) -> str:
+    cleaned = text.replace("\n", " ").replace("\r", " ")
+    return cleaned[:LOG_SNIPPET_LIMIT]
+
+
+def _log_server_event(event: str, payload: dict[str, Any]) -> None:
+    data = {"event": event, "ts": time.time(), **payload}
+    try:
+        sys.stderr.write("[SERVER] " + json.dumps(data) + "\n")
+    except Exception:
+        return
+
+
 def _run_server(args: argparse.Namespace) -> int:
     configure_logging(args.verbose)
     socket_path = resolve_socket_path(args.socket)
     log_path = resolve_log_path(args.log_file)
+    state_path = resolve_state_path(None)
     ensure_directory(socket_path.parent)
     ensure_directory(log_path.parent)
+    ensure_directory(state_path.parent)
 
     if socket_path.exists():
-        status = _get_server_status(socket_path)
+        status = _get_server_status(socket_path, state_path=state_path)
         if status:
             sys.stderr.write(
                 f"[INFO] Server already running (model={status['model']}).\n"
             )
             return 0
-        _remove_stale_socket(socket_path)
+        _cleanup_stale_resources(socket_path, state_path)
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.bind(str(socket_path))
     os.chmod(socket_path, 0o600)
-    sock.listen(1)
+    sock.listen(SERVER_LISTEN_BACKLOG)
 
     model_name = args.model or DEFAULT_MLX_MODEL
     defaults = {
@@ -740,6 +953,18 @@ def _run_server(args: argparse.Namespace) -> int:
     loaded = _load_model(model_name, args.trust_remote_code)
     model = loaded[0]
     tokenizer = loaded[1]
+    _write_state(
+        state_path,
+        {
+            "pid": os.getpid(),
+            "model": model_name,
+            "defaults": defaults,
+            "socket": str(socket_path),
+            "log": str(log_path),
+            "started_at": time.time(),
+        },
+    )
+    atexit.register(_remove_path, state_path)
     sys.stderr.write(
         "[INFO] Server defaults: "
         + json.dumps({"model": model_name, "defaults": defaults})
@@ -760,6 +985,7 @@ def _run_server(args: argparse.Namespace) -> int:
                 )
     finally:
         sock.close()
+        _remove_path(state_path)
         _remove_stale_socket(socket_path)
     return 0
 
@@ -767,6 +993,7 @@ def _run_server(args: argparse.Namespace) -> int:
 def _server_start(args: argparse.Namespace) -> int:
     socket_path = resolve_socket_path(args.socket)
     log_path = resolve_log_path(args.log_file)
+    state_path = resolve_state_path(None)
     model = args.model or DEFAULT_MLX_MODEL
     defaults = {
         "max_new_tokens": args.max_new_tokens,
@@ -776,7 +1003,7 @@ def _server_start(args: argparse.Namespace) -> int:
         "no_chat_template": args.no_chat_template,
     }
 
-    status = _get_server_status(socket_path)
+    status = _get_server_status(socket_path, state_path=state_path)
     if status:
         if status.get("model") != model:
             msg = (
@@ -823,6 +1050,7 @@ def _server_start(args: argparse.Namespace) -> int:
         model=model,
         socket_path=socket_path,
         log_path=log_path,
+        state_path=state_path,
         trust_remote_code=args.trust_remote_code,
         verbose=args.verbose,
         max_new_tokens=args.max_new_tokens,
@@ -869,6 +1097,7 @@ def _server_start(args: argparse.Namespace) -> int:
 def _server_stop(args: argparse.Namespace) -> int:
     socket_path = resolve_socket_path(args.socket)
     log_path = resolve_log_path(args.log_file)
+    state_path = resolve_state_path(None)
     defaults = {
         "max_new_tokens": args.max_new_tokens,
         "temperature": args.temperature,
@@ -876,10 +1105,10 @@ def _server_stop(args: argparse.Namespace) -> int:
         "top_k": args.top_k,
         "no_chat_template": args.no_chat_template,
     }
-    status = _get_server_status(socket_path)
+    status = _get_server_status(socket_path, state_path=state_path)
     if not status:
         if socket_path.exists():
-            _remove_stale_socket(socket_path)
+            _cleanup_stale_resources(socket_path, state_path)
         if args.verbose:
             sys.stderr.write("[INFO] No running server found.\n")
         print(
@@ -916,7 +1145,12 @@ def _server_stop(args: argparse.Namespace) -> int:
             )
         )
         return 1
-    _wait_for_server(socket_path, timeout=2.0)
+    _wait_for_server(
+        socket_path,
+        state_path=state_path,
+        timeout=2.0,
+        status_timeout=0.5,
+    )
     if args.verbose:
         sys.stderr.write("[INFO] Server stopped.\n")
     print(
@@ -938,7 +1172,8 @@ def _server_stop(args: argparse.Namespace) -> int:
 def _server_status(args: argparse.Namespace) -> int:
     socket_path = resolve_socket_path(args.socket)
     log_path = resolve_log_path(args.log_file)
-    status = _get_server_status(socket_path)
+    state_path = resolve_state_path(None)
+    status = _get_server_status(socket_path, state_path=state_path)
     if not status:
         print(
             json.dumps(
@@ -970,22 +1205,29 @@ def _server_status(args: argparse.Namespace) -> int:
 def _translate_via_server(args: argparse.Namespace, prompt: str) -> str | None:
     socket_path = resolve_socket_path(args.socket)
     overrides = _build_request_overrides(args)
-    response = _send_request(
-        socket_path,
-        {
-            "type": "translate",
-            "prompt": prompt,
-            **overrides,
-        },
-    )
-    if not response or not response.get("ok"):
-        return None
-    return str(response.get("text", ""))
+    payload = {
+        "type": "translate",
+        "prompt": prompt,
+        **overrides,
+    }
+    deadline = time.time() + TRANSLATE_CONNECT_DEADLINE
+    while True:
+        response = _send_request_with_connect_timeout(
+            socket_path,
+            payload,
+            connect_timeout=TRANSLATE_CONNECT_TIMEOUT,
+        )
+        if response and response.get("ok"):
+            return str(response.get("text", ""))
+        if time.time() >= deadline:
+            return None
+        time.sleep(TRANSLATE_CONNECT_SLEEP)
 
 
 def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
     server_mode = args.server
     socket_path = resolve_socket_path(args.socket)
+    state_path = resolve_state_path(None)
     model = args.model or DEFAULT_MLX_MODEL
 
     if args.stream and server_mode != "never":
@@ -997,7 +1239,7 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
         server_mode = "never"
 
     if server_mode != "never":
-        status = _get_server_status(socket_path)
+        status = _get_server_status(socket_path, state_path=state_path)
         if status:
             if args.model is not None and status.get("model") != args.model:
                 sys.stderr.write(
@@ -1014,14 +1256,15 @@ def _translate_prompt(prompt: str, args: argparse.Namespace) -> int:
             print(translation)
             return 0
 
-        if socket_path.exists():
-            _remove_stale_socket(socket_path)
+        if socket_path.exists() or state_path.exists():
+            _cleanup_stale_resources(socket_path, state_path)
 
         gen_args = _resolve_generation_args(args)
         status = _start_server(
             model=model,
             socket_path=socket_path,
             log_path=resolve_log_path(args.log_file),
+            state_path=state_path,
             trust_remote_code=args.trust_remote_code,
             verbose=args.verbose,
             max_new_tokens=gen_args["max_new_tokens"],

@@ -14,7 +14,7 @@ from typing import Iterable, List, Optional, Tuple
 
 from . import cli as cat_cli
 
-DEFAULT_MODEL = "hotchpotch/CAT-Translate-1.4b-mlx-q8"
+DEFAULT_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
 DEFAULT_INPUT_LANG = "en"
 DEFAULT_OUTPUT_LANG = "ja"
 DEFAULT_AUTO_TRANSLATE_DIR = Path.home() / "Downloads"
@@ -37,6 +37,8 @@ DEFAULT_PDF2ZH_ARGS = [
     "--watermark-output-mode",
     "no_watermark",
     "--use-alternating-pages-dual",
+    "--qps",
+    "4",
 ]
 
 
@@ -118,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-new-tokens",
         type=int,
-        default=cat_cli.DEFAULT_MAX_NEW_TOKENS,
+        default=1024,
         help="Maximum number of new tokens to generate.",
     )
     parser.add_argument(
@@ -155,11 +157,6 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Print planned commands and outputs without running translation.",
-    )
-    parser.add_argument(
-        "--no-title-slug",
-        action="store_true",
-        help="Do not append a title-based suffix to output filenames.",
     )
     parser.add_argument(
         "--no-strip-paren-index",
@@ -329,42 +326,6 @@ def cleanup_extras(
             sys.stderr.write(f"Warning: failed to remove {path}: {exc}\n")
 
 
-def make_title_slug(pdf_path: Path) -> Optional[str]:
-    if shutil.which("pdftotext") is None:
-        sys.stderr.write("Warning: pdftotext not found; skipping title extraction.\n")
-        return None
-
-    try:
-        result = subprocess.run(
-            ["pdftotext", "-f", "1", "-l", "1", str(pdf_path), "-"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        sys.stderr.write(
-            f"Warning: pdftotext failed ({exc.returncode}); skipping title extraction.\n"
-        )
-        return None
-
-    lines = result.stdout.splitlines()[:5]
-    text = " ".join(lines)
-    text = re.sub(r"\s+", " ", text).strip()
-    if not text:
-        return None
-
-    matches: list[str] = re.findall(r"[A-Za-z0-9 ]+", text)
-    if not matches:
-        return None
-
-    candidate = max(matches, key=len)
-    candidate = re.sub(r"\s+", " ", str(candidate)).strip()
-    if not candidate:
-        return None
-    candidate = candidate[:50].replace(" ", "_")
-    return candidate
-
-
 def pick_output_file(paths: Iterable[Path], stem: str) -> Optional[Path]:
     pdfs = [p for p in paths if p.suffix.lower() == ".pdf"]
     if not pdfs:
@@ -465,10 +426,14 @@ def build_cat_translate_command(
     return " ".join(shlex.quote(part) for part in command)
 
 
-def wait_for_server_stop(socket_path: Path, timeout: float = 10.0) -> bool:
+def wait_for_server_stop(
+    socket_path: Path,
+    state_path: Path,
+    timeout: float = 10.0,
+) -> bool:
     start = time.time()
     while time.time() - start < timeout:
-        if not cat_cli._get_server_status(socket_path):
+        if not cat_cli._get_server_status(socket_path, state_path=state_path):
             return True
         time.sleep(0.2)
     return False
@@ -487,7 +452,8 @@ def ensure_cat_translate_server(
     top_k: int,
     no_chat_template: bool,
 ) -> None:
-    status = cat_cli._get_server_status(socket_path)
+    state_path = cat_cli.resolve_state_path(None)
+    status = cat_cli._get_server_status(socket_path, state_path=state_path)
     if status and status.get("model") != model:
         sys.stderr.write(
             f"[WARN] Server running with model {status.get('model')}; restarting with {model}.\n"
@@ -495,7 +461,7 @@ def ensure_cat_translate_server(
         response = cat_cli._send_request(socket_path, {"type": "stop"}, timeout=2.0)
         if not response or not response.get("ok"):
             raise SystemExit("Failed to stop existing server.")
-        if not wait_for_server_stop(socket_path):
+        if not wait_for_server_stop(socket_path, state_path):
             raise SystemExit("Server did not stop in time.")
         status = None
 
@@ -508,6 +474,7 @@ def ensure_cat_translate_server(
         model=model,
         socket_path=socket_path,
         log_path=log_path,
+        state_path=state_path,
         trust_remote_code=trust_remote_code,
         verbose=verbose,
         max_new_tokens=max_new_tokens,
@@ -674,11 +641,7 @@ def main() -> int:
             dest_name = dest.name
         else:
             dest_dir = args.output_dir.expanduser() if args.output_dir else pdf_path.parent
-            title_slug = None if args.no_title_slug else make_title_slug(pdf_path)
-            if title_slug:
-                dest_name = f"{base_clean}.{output_code}.{title_slug}.pdf"
-            else:
-                dest_name = f"{base_clean}.{output_code}.pdf"
+            dest_name = f"{base_clean}.{output_code}.pdf"
             dest = dest_dir / dest_name
 
         dest_dir.mkdir(parents=True, exist_ok=True)
