@@ -20,6 +20,10 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
   - Typecheck only: `uv run ty check`
   - Tests only: `uv run pytest`
   - MLX integration tests: `RUN_MLX_INTEGRATION=1 uv run pytest -m integration`
+- Release:
+  - Keep `release-log.md` updated (use `HEAD` for unreleased changes).
+  - Run `python ./build.py --release` to test, build, publish, and tag.
+  - `build.py` fails if git is dirty or `uv.lock` is out of date.
 
 ## Key Directories
 - `neko_translate/`
