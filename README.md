@@ -1,61 +1,53 @@
 # 🐈 NEKO-translate
 
-NEKO-translate は、Mac の Apple Silicon に最適化した MLX フレームワークで翻訳を行う CLI アプリです。  
-[mlx-lm](https://github.com/ml-explore/mlx-lm) を使って推論の最適化を行っています。
+NEKO-translate は、Mac の Apple Silicon で動く mlx フレームワークを用いて、翻訳を行う cli アプリケーションです。推論には [mlx-lm](https://github.com/ml-explore/mlx-lm) で最適化しています。
 
-PDF の見開き翻訳が可能な CLI も同梱しており、論文などの長文を交互に読みたいときに便利です。
+PDF の見開き翻訳コマンドも同梱されており、たとえば論文のページを原文・訳文と交互に読み進めるのに便利です。
 
 ![PDF bilingual example](https://github.com/hotchpotch/NEKO-translate/raw/main/assets/pdf_translated_example.jpg)
 
 ## できること
 
-- 日英翻訳（入力自動判定）
-- モデルによっては多言語翻訳にも対応
-- 常駐サーバーで起動コストを削減
-- 対話モード（引数なしで起動すると REPL）
-- ストリーミング出力（対話モードはデフォルト ON）
-- PDF 見開き翻訳（pdf2zh_next + neko-translate）
+- 日英翻訳
+  - モデルによっては多言語翻訳にも対応
+- サーバーモードで常駐可能・起動コストを削減
+- 対話モード翻訳
+- ストリーミング出力 (対話モードはデフォルト ON )
+- PDF 見開き翻訳 - [pdf2zh_next を内部で利用](https://github.com/PDFMathTranslate-next/PDFMathTranslate-next)
 
 ## インストール
 
 ### uv tool（おすすめ）
 
-まず uv を入れてください。  
-https://docs.astral.sh/uv/getting-started/installation/
+まず python パッケージマネージャの uv を入れてください。
 
-そのあと:
+- https://docs.astral.sh/uv/getting-started/installation/
+
+その後
 
 ```bash
 uv tool install neko-translate
 ```
 
-これで `neko-translate` と `neko-translate-pdf` コマンドが使えます。
-
-### pip
-
-```bash
-pip install neko-translate
-```
-
-### 開発用
-
-```bash
-uv sync
-```
+でインストールすると、 `neko-translate` と `neko-translate-pdf` コマンドが使えます。
 
 ## 使い方
 
-### 1) ワンショット翻訳
+### 1) cli からの翻訳
 
 ```bash
-neko-translate --text "こんにちは"
+neko-translate --text "こんにちは、可愛い🐈ですね"
+# Hello.
 ```
 
-言語を明示したい場合:
+なお、初回はモデルのダウンロードが行われるため、時間がかかるでしょう。言語を明示したい場合
 
 ```bash
 neko-translate --text "Hello" --input-lang en --output-lang ja
+# こんにちは。
 ```
+
+なお、標準入力で文章が渡されると、その翻訳文を出力します。
 
 ### 2) 対話モード
 
@@ -77,11 +69,11 @@ Hello.
 neko-translate --stream --server never --text "こんにちは"
 ```
 
-ストリーミングはサーバー経由では使えません。`--stream` を付けると自動的に直起動に切り替わります。
+ストリーミングはサーバー経由では使えません。`--stream` を付けると直起動に切り替わります。
 
 ### 4) サーバーモード
 
-起動コストが気になる場合はサーバーを起動して使ってください。
+起動コストが気になる場合はサーバーとして立ち上げることで、モデルのロードを省略することができます。
 
 ```bash
 neko-translate server start
@@ -89,7 +81,7 @@ neko-translate --text "こんにちは"
 neko-translate server stop
 ```
 
-サーバーは `~/.config/neko-translate/` にソケットとログを作ります。
+サーバーは `~/.config/neko-translate/` に通信用の socket とログを出力します。
 
 - socket: `~/.config/neko-translate/neko-translate.sock`
 - log: `~/.config/neko-translate/server.log`
@@ -114,52 +106,48 @@ pdf2zh_next を使って PDF を丸ごと翻訳します。翻訳は neko-transl
 
 ```bash
 neko-translate-pdf paper.pdf
+# 見開き翻訳しない
+neko-translate-pdf paper.pdf --no-dual
 ```
 
-デフォルトは `--input en --output ja` です。自動判定したい場合:
-
-```bash
-neko-translate-pdf paper.pdf --input auto
-```
-
-和英:
-
-```bash
-neko-translate-pdf paper_ja.pdf --input ja --output en
-```
-
-出力ファイル/ディレクトリを指定:
+デフォルトは `--input en --output ja` です。なお、出力ファイル/ディレクトリを指定も可能です。
 
 ```bash
 neko-translate-pdf paper.pdf --output-pdf translated.pdf
-neko-translate-pdf paper.pdf --output-dir ./out
+neko-translate-pdf paper.pdf --output-dir ./out/
 ```
 
-## モデル
+高品質な PLaMo 翻訳モデルも利用可能です。なお PLaMo モデルの利用には、[PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-ja) への同意が必要です。
 
-デフォルトは以下です。
+```bash
+uv run neko-translate-pdf paper.pdf \
+    --output-dir ./out \
+    --model plamo
+```
+
+## 翻訳モデルの選択
+
+何も指定しない場合、デフォルトは小型高速な以下のモデルです。
 
 - `hotchpotch/CAT-Translate-0.8b-mlx-q4`
 
-短いエイリアスも用意しています（例: `hymt`）。
+短いエイリアスも用意しています（例: `cat`）。
 
-モデルのおすすめとライセンス:
+### おすすめモデル
 
 - **PLaMo 2 Translate（おすすめ）**
-  - 論文や技術文書の翻訳品質が特に良く、まずこれを試すのがおすすめです。
-  - 利用には **PLaMo Community License** への同意が必要です（条件付きで商用利用も可能）。
+  - 論文や技術文書の翻訳が特に良いです。
+  - 利用には **PLaMo Community License** への同意が必要です(なお条件付きで商用利用も可能)。
   - ライセンス: [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-ja)
 - **CAT-Translate**
-  - MIT ライセンスのため、商用利用でも制約が少なく扱いやすいです。
-- **HY-MT**
-  - 利用にはライセンスへの同意が必要です。
-  - ライセンス: [HY-MT License](https://github.com/Tencent-Hunyuan/HY-MT/blob/main/License.txt)
+  - MIT ライセンスのため、商用利用でも扱いやすいです。
+  - なお q8 が 8bit, q4 が 4bit モデルです。
 
-このプロジェクト（neko-translate 自体）のソースコードは MIT ですが、**利用する翻訳モデルのライセンスはモデルごとに異なります**。必ず各モデルのライセンスを確認してください。
+なおこのプロジェクト(neko-translate)のソースコードは MIT ですが、利用する翻訳モデルのライセンスはモデルごとに異なります。利用の際は、必ず各モデルのライセンスを確認してください。
 
-### 動作確認済みの MLX 翻訳モデル（Hugging Face / ライセンス）
+### 動作確認済みの MLX 翻訳モデル
 
-| Model | Hugging Face name | License |
+| Model | Hugging Face | License |
 | --- | --- | --- |
 | [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-0.8b-mlx-q4` | MIT |
 | [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-0.8b-mlx-q8` | MIT |
@@ -167,17 +155,6 @@ neko-translate-pdf paper.pdf --output-dir ./out
 | [CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate) | `hotchpotch/CAT-Translate-1.4b-mlx-q8` | MIT |
 | [PLaMo 2 Translate](https://huggingface.co/pfnet/plamo-2-translate) | `mlx-community/plamo-2-translate` | [PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-ja) |
 | [HY-MT 1.5](https://github.com/Tencent-Hunyuan/HY-MT) | `mlx-community/HY-MT1.5-1.8B-4bit` / `mlx-community/HY-MT1.5-1.8B-8bit` / `mlx-community/HY-MT1.5-7B-4bit` / `mlx-community/HY-MT1.5-7B-8bit` | [HY-MT License](https://github.com/Tencent-Hunyuan/HY-MT/blob/main/License.txt) |
-
-## オプション
-
-主要なものだけ。
-
-- `--input-lang` / `--output-lang`
-- `--max-new-tokens`
-- `--temperature` / `--top-p` / `--top-k`
-- `--server` : `auto` / `always` / `never`
-- `--socket` / `--log-file`
-- `--verbose`
 
 ## 開発
 
@@ -189,17 +166,27 @@ uv run tox
 
 ## 注意点
 
-- Apple Silicon (macOS) での使用を想定しています。
+- Apple Silicon (macOS) での使用を想定しています。他の OS は想定しておりません。
 - 初回はモデルのダウンロードが走ります。
-- `uv run` は毎回同期するので、実行前にインストールログが出ます。気になる場合は `--no-sync` を使ってください。
 
 ```bash
 uv run --no-sync neko-translate --text "こんにちは"
 ```
 
+## FAQ
+
+- なんで server は mcp じゃないの？
+  - mcp 使わないので、つけることはないと思います
+
 ## ライセンス
 
 - ソースコード: MIT
+
+## 謝辞
+
+小型で使いやすそうな MIT ライセンスの翻訳モデル、[CAT Translate](https://huggingface.co/collections/cyberagent/cat-translate)モデルを mac からサクッと使ってみたくて作成しました。プロジェクト名もインスパイアされています。CAT Translate プロジェクトの関係者の方々、ありがとうございます。
+
+また cli は [plamo-translate-cli](https://github.com/pfnet/plamo-translate-cli) が便利だったので、同じように起動しっぱなしで翻訳できる実装を作ってみました。PLaMo は翻訳も cli も便利大変便利です、PLaMo 関連の方々、ありがとうございます。
 
 ## Author
 
