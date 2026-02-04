@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-from . import cli as neko_cli
+from . import cli as beko_cli
 from .translation_models import resolve_model_alias
 
 DEFAULT_MODEL = "hotchpotch/CAT-Translate-1.4b-mlx-q8"
@@ -21,7 +21,7 @@ DEFAULT_OUTPUT_LANG = "ja"
 DEFAULT_AUTO_TRANSLATE_DIR = Path.home() / "Downloads"
 
 PDF2ZH_COMMAND = os.environ.get("PDF2ZH_COMMAND", "uvx pdf2zh_next")
-NEKO_TRANSLATE_COMMAND = os.environ.get("NEKO_TRANSLATE_COMMAND")
+BEKO_TRANSLATE_COMMAND = os.environ.get("BEKO_TRANSLATE_COMMAND")
 
 LANG_ALIASES = {
     "en": "en",
@@ -45,7 +45,7 @@ DEFAULT_PDF2ZH_ARGS = [
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Translate PDFs with pdf2zh_next via neko-translate.",
+        description="Translate PDFs with pdf2zh_next via beko-translate.",
     )
     parser.add_argument(
         "pdf",
@@ -106,7 +106,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--socket",
         default=None,
-        help="Unix domain socket path for neko-translate server.",
+        help="Unix domain socket path for beko-translate server.",
     )
     parser.add_argument(
         "--log-file",
@@ -128,25 +128,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--temperature",
         type=float,
-        default=neko_cli.DEFAULT_TEMPERATURE,
+        default=beko_cli.DEFAULT_TEMPERATURE,
         help="Sampling temperature. 0 disables sampling.",
     )
     parser.add_argument(
         "--repetition-penalty",
         type=float,
-        default=neko_cli.DEFAULT_REPETITION_PENALTY,
+        default=beko_cli.DEFAULT_REPETITION_PENALTY,
         help="Penalty for repeating tokens.",
     )
     parser.add_argument(
         "--top-p",
         type=float,
-        default=neko_cli.DEFAULT_TOP_P,
+        default=beko_cli.DEFAULT_TOP_P,
         help="Top-p sampling value.",
     )
     parser.add_argument(
         "--top-k",
         type=int,
-        default=neko_cli.DEFAULT_TOP_K,
+        default=beko_cli.DEFAULT_TOP_K,
         help="Top-k sampling value.",
     )
     parser.add_argument(
@@ -396,7 +396,7 @@ def translate_pdf(
     return True
 
 
-def build_neko_translate_command(
+def build_beko_translate_command(
     *,
     model: str,
     socket_path: Path,
@@ -406,10 +406,10 @@ def build_neko_translate_command(
     trust_remote_code: bool,
     no_chat_template: bool,
 ) -> str:
-    if NEKO_TRANSLATE_COMMAND:
-        base_command = NEKO_TRANSLATE_COMMAND
+    if BEKO_TRANSLATE_COMMAND:
+        base_command = BEKO_TRANSLATE_COMMAND
     else:
-        base_command = f"{sys.executable} -m neko_translate.cli"
+        base_command = f"{sys.executable} -m beko_translate.cli"
 
     command = shlex.split(base_command)
     command += [
@@ -441,13 +441,13 @@ def wait_for_server_stop(
 ) -> bool:
     start = time.time()
     while time.time() - start < timeout:
-        if not neko_cli._get_server_status(socket_path, state_path=state_path):
+        if not beko_cli._get_server_status(socket_path, state_path=state_path):
             return True
         time.sleep(0.2)
     return False
 
 
-def ensure_neko_translate_server(
+def ensure_beko_translate_server(
     *,
     model: str,
     socket_path: Path,
@@ -461,13 +461,13 @@ def ensure_neko_translate_server(
     top_k: int,
     no_chat_template: bool,
 ) -> bool:
-    state_path = neko_cli.resolve_state_path(None)
-    status = neko_cli._get_server_status(socket_path, state_path=state_path)
+    state_path = beko_cli.resolve_state_path(None)
+    status = beko_cli._get_server_status(socket_path, state_path=state_path)
     if status and status.get("model") != model:
         sys.stderr.write(
             f"[WARN] Server running with model {status.get('model')}; restarting with {model}.\n"
         )
-        response = neko_cli._send_request(socket_path, {"type": "stop"}, timeout=2.0)
+        response = beko_cli._send_request(socket_path, {"type": "stop"}, timeout=2.0)
         if not response or not response.get("ok"):
             raise SystemExit("Failed to stop existing server.")
         if not wait_for_server_stop(socket_path, state_path):
@@ -479,7 +479,7 @@ def ensure_neko_translate_server(
             sys.stderr.write(f"[INFO] Using existing server (model={status.get('model')}).\n")
         return False
 
-    started = neko_cli._start_server(
+    started = beko_cli._start_server(
         model=model,
         socket_path=socket_path,
         log_path=log_path,
@@ -494,7 +494,7 @@ def ensure_neko_translate_server(
         no_chat_template=no_chat_template,
     )
     if not started:
-        raise SystemExit("Failed to start neko-translate server.")
+        raise SystemExit("Failed to start beko-translate server.")
     if verbose:
         sys.stderr.write(
             f"[INFO] Server started (model={started.get('model')}, socket={socket_path}).\n"
@@ -604,17 +604,17 @@ def main() -> int:
 
     ensure_command_available(PDF2ZH_COMMAND)
 
-    socket_path = neko_cli.resolve_socket_path(args.socket)
-    log_path = neko_cli.resolve_log_path(args.log_file)
-    neko_cli.ensure_directory(socket_path.parent)
-    neko_cli.ensure_directory(log_path.parent)
-    neko_cli.configure_logging(args.verbose)
+    socket_path = beko_cli.resolve_socket_path(args.socket)
+    log_path = beko_cli.resolve_log_path(args.log_file)
+    beko_cli.ensure_directory(socket_path.parent)
+    beko_cli.ensure_directory(log_path.parent)
+    beko_cli.configure_logging(args.verbose)
 
     model = resolve_model_alias(args.model, DEFAULT_MODEL)
 
     started_server = False
     if not args.dry_run:
-        started_server = ensure_neko_translate_server(
+        started_server = ensure_beko_translate_server(
             model=model,
             socket_path=socket_path,
             log_path=log_path,
@@ -672,7 +672,7 @@ def main() -> int:
             if dest.exists():
                 print(f"[retranslate] Overwriting {dest.name}.")
 
-            cli_command = build_neko_translate_command(
+            cli_command = build_beko_translate_command(
                 model=model,
                 socket_path=socket_path,
                 log_path=log_path,
@@ -716,11 +716,11 @@ def main() -> int:
                 failed.append(pdf_path)
     finally:
         if started_server:
-            response = neko_cli._send_request(
+            response = beko_cli._send_request(
                 socket_path, {"type": "stop"}, timeout=2.0
             )
             if not response or not response.get("ok"):
-                sys.stderr.write("[WARN] Failed to stop neko-translate server.\n")
+                sys.stderr.write("[WARN] Failed to stop beko-translate server.\n")
 
     print("\nSummary:")
     if args.dry_run:

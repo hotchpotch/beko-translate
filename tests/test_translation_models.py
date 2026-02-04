@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from neko_translate.translation_models import (
+from beko_translate.translation_models import (
     CATTranslateModel,
     HunyuanTranslationModel,
     PlamoTranslateModel,

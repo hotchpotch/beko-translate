@@ -1,5 +1,5 @@
 def main():
-    print("Hello from neko-translate-cli!")
+    print("Hello from beko-translate-cli!")
 
 
 if __name__ == "__main__":

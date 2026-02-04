@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Auto-translate PDFs in ~/Downloads using neko-translate-pdf.
+"""Auto-translate PDFs in ~/Downloads using beko-translate-pdf.
 
 Env overrides:
 - AUTO_PDF_TRANSLATE_INPUT_DIR
@@ -57,7 +57,7 @@ ARXIV_PATTERN = re.compile(r"^\d{4}\.\d{4,5}v\d+( \(\d+\))?\.pdf$")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Auto-translate PDFs in ~/Downloads using neko-translate-pdf."
+        description="Auto-translate PDFs in ~/Downloads using beko-translate-pdf."
     )
     parser.add_argument(
         "-a",
@@ -164,7 +164,7 @@ def main() -> int:
         return 0
 
     cmd = [
-        "neko-translate-pdf",
+        "beko-translate-pdf",
         *[str(p) for p in targets],
         "--output-dir",
         str(output_dir),
