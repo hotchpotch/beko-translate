@@ -1,4 +1,8 @@
-# 🐈 beko-translate
+# beko-translate
+
+<p align="center">
+  <img src="assets/beko-translate.jpg" alt="beko-translate logo" width="320">
+</p>
 
 beko-translate は、Mac の Apple Silicon で動く mlx フレームワークを用いて、翻訳を行う cli アプリケーションです。推論には [mlx-lm](https://github.com/ml-explore/mlx-lm) で最適化しています。
 
@@ -42,7 +46,7 @@ uv tool upgrade beko-translate
 ### 1) cli からの翻訳
 
 ```bash
-beko-translate --text "こんにちは、可愛い🐈ですね"
+beko-translate --text "こんにちは"
 # Hello.
 ```
 
