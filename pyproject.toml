@@ -1,5 +1,5 @@
 [project]
-name = "neko-translate"
+name = "beko-translate"
 version = "0.0.2"
 description = "MLX-based translation CLI with PDF translation support."
 license = { text = "MIT" }
@@ -36,21 +36,21 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hotchpotch/NEKO-translate"
-Repository = "https://github.com/hotchpotch/NEKO-translate"
-Documentation = "https://github.com/hotchpotch/NEKO-translate"
-Issues = "https://github.com/hotchpotch/NEKO-translate/issues"
+Homepage = "https://github.com/hotchpotch/beko-translate"
+Repository = "https://github.com/hotchpotch/beko-translate"
+Documentation = "https://github.com/hotchpotch/beko-translate"
+Issues = "https://github.com/hotchpotch/beko-translate/issues"
 
 [project.scripts]
-neko-translate = "neko_translate:main"
-neko-translate-pdf = "neko_translate.pdf_cli:main"
+beko-translate = "beko_translate:main"
+beko-translate-pdf = "beko_translate.pdf_cli:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["neko_translate*"]
+include = ["beko_translate*"]
 
 [dependency-groups]
 dev = [

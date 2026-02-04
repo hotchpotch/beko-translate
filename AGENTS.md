@@ -1,20 +1,20 @@
-# NEKO-Translate CLI - Agent Notes
+# beko-translate CLI - Agent Notes
 
 ## Overview
-This project provides a small MLX-based translation CLI for NEKO-Translate.
-The primary entrypoint is the `neko-translate` command (installed via `uv run`).
+This project provides a small MLX-based translation CLI for beko-translate.
+The primary entrypoint is the `beko-translate` command (installed via `uv run`).
 
 ## Development Workflow
 - Install deps: `uv sync` (or `uv add --dev ...` when adding dev tools)
-- Run CLI: `uv run neko-translate --text "Hello" --input-lang en --output-lang ja`
-- PDF CLI: `uv run neko-translate-pdf paper.pdf --input en --output ja`
-- Interactive (default when no args + tty): `uv run neko-translate`
-- Streaming (one-shot): `uv run neko-translate --stream --server never --text "こんにちは"`
+- Run CLI: `uv run beko-translate --text "Hello" --input-lang en --output-lang ja`
+- PDF CLI: `uv run beko-translate-pdf paper.pdf --input en --output ja`
+- Interactive (default when no args + tty): `uv run beko-translate`
+- Streaming (one-shot): `uv run beko-translate --stream --server never --text "こんにちは"`
 - Server mode:
-  - Start: `uv run neko-translate server start`
-  - Status: `uv run neko-translate server status`
-  - Stop: `uv run neko-translate server stop`
-  - Use server automatically: `uv run neko-translate --server auto`
+  - Start: `uv run beko-translate server start`
+  - Status: `uv run beko-translate server status`
+  - Stop: `uv run beko-translate server stop`
+  - Use server automatically: `uv run beko-translate --server auto`
 - Run tests + lint + typecheck: `uv run tox` (includes MLX integration tests)
   - Lint only: `uv run ruff check .`
   - Typecheck only: `uv run ty check`
@@ -26,9 +26,9 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
   - `build.py` fails if git is dirty or `uv.lock` is out of date.
 
 ## Key Directories
-- `neko_translate/`
+- `beko_translate/`
   - `cli.py`: MLX-only translation CLI implementation
-  - `pdf_cli.py`: PDF translation CLI (pdf2zh_next + neko-translate)
+  - `pdf_cli.py`: PDF translation CLI (pdf2zh_next + beko-translate)
   - `__init__.py`: exposes `main`
 - `scripts/`
   - `to_mlx.py`: convert HF models to MLX (q4/q8) using `mlx_lm.convert`
@@ -53,10 +53,10 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
   - Aliases: `hymt` -> 1.8B-4bit
 
 ## Notes
-- `neko-translate` supports `--text` or stdin input.
+- `beko-translate` supports `--text` or stdin input.
 - If `--input-lang` and `--output-lang` are omitted, `fast-langdetect` is used to
   detect English/Japanese (k=3) and infer the direction.
-- `neko-translate` defaults:
+- `beko-translate` defaults:
   - model: `hotchpotch/CAT-Translate-0.8b-mlx-q4`
   - sampling: temperature=0.0, top_p=0.98, top_k=0
   - no-repeat: ngram=4, window=128
@@ -65,12 +65,12 @@ The primary entrypoint is the `neko-translate` command (installed via `uv run`).
 - Model aliases:
   - `cat` -> `hotchpotch/CAT-Translate-1.8b-mlx-q8`
   - `plamo` -> `mlx-community/plamo-2-translate`
-- `neko-translate-pdf` defaults:
+- `beko-translate-pdf` defaults:
   - en->ja, model `hotchpotch/CAT-Translate-1.4b-mlx-q8`
   - max-new-tokens=1024
   - pdf2zh args include `--qps 4`
-- If `neko-translate-pdf` starts a server itself, it will stop it after the
+- If `beko-translate-pdf` starts a server itself, it will stop it after the
   translations finish. Existing servers are left running.
-- Server uses a Unix domain socket under `~/.config/neko-translate/` with
-  `neko-translate.sock` and `server.log` by default. Override with
-  `--socket/--log-file` or `NEKO_TRANSLATE_SOCKET/NEKO_TRANSLATE_LOG`.
+- Server uses a Unix domain socket under `~/.config/beko-translate/` with
+  `beko-translate.sock` and `server.log` by default. Override with
+  `--socket/--log-file` or `BEKO_TRANSLATE_SOCKET/BEKO_TRANSLATE_LOG`.

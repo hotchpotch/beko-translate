@@ -1,10 +1,10 @@
-# 🐈 NEKO-translate
+# 🐈 beko-translate
 
-NEKO-translate は、Mac の Apple Silicon で動く mlx フレームワークを用いて、翻訳を行う cli アプリケーションです。推論には [mlx-lm](https://github.com/ml-explore/mlx-lm) で最適化しています。
+beko-translate は、Mac の Apple Silicon で動く mlx フレームワークを用いて、翻訳を行う cli アプリケーションです。推論には [mlx-lm](https://github.com/ml-explore/mlx-lm) で最適化しています。
 
 PDF の見開き翻訳コマンドも同梱されており、たとえば論文のページを原文・訳文と交互に読み進めるのに便利です。
 
-![PDF bilingual example](https://github.com/hotchpotch/NEKO-translate/raw/main/assets/pdf_translated_example.jpg)
+![PDF bilingual example](https://github.com/hotchpotch/beko-translate/raw/main/assets/pdf_translated_example.jpg)
 
 ## できること
 
@@ -26,15 +26,15 @@ PDF の見開き翻訳コマンドも同梱されており、たとえば論文�
 その後
 
 ```bash
-uv tool install neko-translate
+uv tool install beko-translate
 ```
 
-でインストールすると、 `neko-translate` と `neko-translate-pdf` コマンドが使えます。
+でインストールすると、 `beko-translate` と `beko-translate-pdf` コマンドが使えます。
 
 ### 更新方法
 
 ```bash
-uv tool upgrade neko-translate
+uv tool upgrade beko-translate
 ```
 
 ## 使い方
@@ -42,14 +42,14 @@ uv tool upgrade neko-translate
 ### 1) cli からの翻訳
 
 ```bash
-neko-translate --text "こんにちは、可愛い🐈ですね"
+beko-translate --text "こんにちは、可愛い🐈ですね"
 # Hello.
 ```
 
 なお、初回はモデルのダウンロードが行われるため、時間がかかるでしょう。言語を明示したい場合
 
 ```bash
-neko-translate --text "Hello" --input-lang en --output-lang ja
+beko-translate --text "Hello" --input-lang en --output-lang ja
 # こんにちは。
 ```
 
@@ -60,7 +60,7 @@ neko-translate --text "Hello" --input-lang en --output-lang ja
 引数なしで起動すると対話モードになります。
 
 ```bash
-neko-translate
+beko-translate
 ```
 
 ```
@@ -72,7 +72,7 @@ Hello.
 ### 3) ストリーミング出力
 
 ```bash
-neko-translate --stream --server never --text "こんにちは"
+beko-translate --stream --server never --text "こんにちは"
 ```
 
 ストリーミングはサーバー経由では使えません。`--stream` を付けると直起動に切り替わります。
@@ -82,52 +82,52 @@ neko-translate --stream --server never --text "こんにちは"
 起動コストが気になる場合はサーバーとして立ち上げることで、モデルのロードを省略することができます。
 
 ```bash
-neko-translate server start
-neko-translate --text "こんにちは"
-neko-translate server stop
+beko-translate server start
+beko-translate --text "こんにちは"
+beko-translate server stop
 ```
 
-サーバーは `~/.config/neko-translate/` に通信用の socket とログを出力します。
+サーバーは `~/.config/beko-translate/` に通信用の socket とログを出力します。
 
-- socket: `~/.config/neko-translate/neko-translate.sock`
-- log: `~/.config/neko-translate/server.log`
+- socket: `~/.config/beko-translate/beko-translate.sock`
+- log: `~/.config/beko-translate/server.log`
 
 任意の場所を使いたい場合:
 
 ```bash
-neko-translate server start \
-  --socket ~/.config/neko-translate/test.sock \
-  --log-file ~/.config/neko-translate/test.log
+beko-translate server start \
+  --socket ~/.config/beko-translate/test.sock \
+  --log-file ~/.config/beko-translate/test.log
 ```
 
 状態確認:
 
 ```bash
-neko-translate server status
+beko-translate server status
 ```
 
 ### 5) PDF 翻訳
 
-PDF を丸ごと翻訳します。翻訳は neko-translate サーバー経由でできるだけ高速に行います。なお内部では[PDFMathTranslate-next](https://github.com/PDFMathTranslate-next/PDFMathTranslate-next)を利用しています。
+PDF を丸ごと翻訳します。翻訳は beko-translate サーバー経由でできるだけ高速に行います。なお内部では[PDFMathTranslate-next](https://github.com/PDFMathTranslate-next/PDFMathTranslate-next)を利用しています。
 
 
 ```bash
-neko-translate-pdf paper.pdf
+beko-translate-pdf paper.pdf
 # 見開き翻訳しない場合
-neko-translate-pdf paper.pdf --no-dual
+beko-translate-pdf paper.pdf --no-dual
 ```
 
 デフォルト言語は `--input en --output ja` です。なお、出力ファイル/ディレクトリを指定も可能です。
 
 ```bash
-neko-translate-pdf paper.pdf --output-pdf translated.pdf
-neko-translate-pdf paper.pdf --output-dir ./out/
+beko-translate-pdf paper.pdf --output-pdf translated.pdf
+beko-translate-pdf paper.pdf --output-dir ./out/
 ```
 
 高品質な PLaMo 翻訳モデルも利用可能です。なお PLaMo モデルの利用には、[PLaMo Community License](https://plamo.preferredai.jp/info/plamo-community-license-ja) への同意が必要です。
 
 ```bash
-uv run neko-translate-pdf paper.pdf \
+uv run beko-translate-pdf paper.pdf \
     --output-dir ./out \
     --model plamo
 ```
@@ -159,7 +159,7 @@ uv run neko-translate-pdf paper.pdf \
   - MIT ライセンスのため、商用利用でも扱いやすいです。
   - なお q8 が 8bit, q4 が 4bit モデルです。
 
-なおこのプロジェクト(neko-translate)のソースコードは MIT ですが、利用する翻訳モデルのライセンスはモデルごとに異なります。利用の際は、必ず各モデルのライセンスを確認してください。
+なおこのプロジェクト(beko-translate)のソースコードは MIT ですが、利用する翻訳モデルのライセンスはモデルごとに異なります。利用の際は、必ず各モデルのライセンスを確認してください。
 
 ### 動作確認済みの MLX 翻訳モデル
 
@@ -186,7 +186,7 @@ uv run tox
 - 初回はモデルのダウンロードが走ります。
 
 ```bash
-uv run --no-sync neko-translate --text "こんにちは"
+uv run --no-sync beko-translate --text "こんにちは"
 ```
 
 ## FAQ

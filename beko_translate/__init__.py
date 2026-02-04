@@ -5,7 +5,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 def get_version() -> str:
     try:
-        return version("neko-translate")
+        return version("beko-translate")
     except PackageNotFoundError:
         return "0.0.0"
 

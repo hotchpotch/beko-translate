@@ -814,7 +814,7 @@ wheels = [
 ]
 
 [[package]]
-name = "neko-translate"
+name = "beko-translate"
 version = "0.0.2"
 source = { editable = "." }
 dependencies = [

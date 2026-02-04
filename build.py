@@ -58,7 +58,7 @@ def clean_dist(dist_path: Path) -> None:
 
 
 def build_publish_files(dist_path: Path, version: str) -> list[Path]:
-    pattern = f"neko_translate-{version}*"
+    pattern = f"beko_translate-{version}*"
     return sorted(dist_path.glob(pattern))
 
 
@@ -120,7 +120,7 @@ def release(pyproject_path: Path, log_path: Path, ignore_git_warnings: bool) -> 
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Release helper for neko-translate.")
+    parser = argparse.ArgumentParser(description="Release helper for beko-translate.")
     parser.add_argument(
         "--release",
         action="store_true",

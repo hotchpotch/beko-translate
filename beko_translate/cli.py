@@ -20,12 +20,12 @@ from typing import Any, Iterable, Iterator
 from . import get_version
 from .translation_models import resolve_model_alias, resolve_translation_model
 DEFAULT_MLX_MODEL = "hotchpotch/CAT-Translate-0.8b-mlx-q4"
-DEFAULT_SOCKET_NAME = "neko-translate.sock"
+DEFAULT_SOCKET_NAME = "beko-translate.sock"
 DEFAULT_LOG_NAME = "server.log"
 DEFAULT_STATE_NAME = "server.json"
 SERVER_MODES = ("auto", "always", "never")
 DEFAULT_SERVER_MODE = "auto"
-DEFAULT_CONFIG_DIR = Path("~/.config/neko-translate").expanduser()
+DEFAULT_CONFIG_DIR = Path("~/.config/beko-translate").expanduser()
 DEFAULT_MAX_NEW_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.0
 DEFAULT_TOP_P = 0.98
@@ -94,13 +94,13 @@ SUPPORTED_LANGS = set(LANG_CODE_MAP.values())
 
 def build_translate_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Translate with NEKO-Translate (MLX only).",
+        description="Translate with beko-translate (MLX only).",
         epilog=(
             "Server commands:\n"
-            "  neko-translate server start\n"
-            "  neko-translate server stop\n"
-            "  neko-translate server status\n"
-            "  neko-translate server run\n"
+            "  beko-translate server start\n"
+            "  beko-translate server stop\n"
+            "  beko-translate server status\n"
+            "  beko-translate server run\n"
             "Use --socket/--log-file to control server paths."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -118,7 +118,7 @@ def build_translate_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"neko-translate {get_version()}",
+        version=f"beko-translate {get_version()}",
         help="Show version and exit.",
     )
     parser.add_argument(
@@ -209,13 +209,13 @@ def build_translate_parser() -> argparse.ArgumentParser:
         "--socket",
         type=str,
         default=None,
-        help="Unix domain socket path (default: ~/.config/neko-translate/neko-translate.sock).",
+        help="Unix domain socket path (default: ~/.config/beko-translate/beko-translate.sock).",
     )
     parser.add_argument(
         "--log-file",
         type=str,
         default=None,
-        help="Server log file path (default: ~/.config/neko-translate/server.log).",
+        help="Server log file path (default: ~/.config/beko-translate/server.log).",
     )
     parser.add_argument(
         "--verbose",
@@ -236,7 +236,7 @@ SERVER_ACTIONS = ("start", "stop", "status", "run")
 def build_server_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Manage NEKO-Translate MLX server. Actions: start, stop, status, run."
+            "Manage beko-translate MLX server. Actions: start, stop, status, run."
         ),
     )
     parser.add_argument(
@@ -252,20 +252,20 @@ def build_server_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"neko-translate {get_version()}",
+        version=f"beko-translate {get_version()}",
         help="Show version and exit.",
     )
     parser.add_argument(
         "--socket",
         type=str,
         default=None,
-        help="Unix domain socket path (default: ~/.config/neko-translate/neko-translate.sock).",
+        help="Unix domain socket path (default: ~/.config/beko-translate/beko-translate.sock).",
     )
     parser.add_argument(
         "--log-file",
         type=str,
         default=None,
-        help="Server log file path (default: ~/.config/neko-translate/server.log).",
+        help="Server log file path (default: ~/.config/beko-translate/server.log).",
     )
     parser.add_argument(
         "--trust-remote-code",
@@ -529,7 +529,7 @@ def ensure_directory(path: Path, mode: int = 0o700) -> None:
 def resolve_socket_path(value: str | None) -> Path:
     if value:
         return Path(value).expanduser()
-    env = os.environ.get("NEKO_TRANSLATE_SOCKET")
+    env = os.environ.get("BEKO_TRANSLATE_SOCKET")
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_SOCKET_NAME
@@ -538,7 +538,7 @@ def resolve_socket_path(value: str | None) -> Path:
 def resolve_log_path(value: str | None) -> Path:
     if value:
         return Path(value).expanduser()
-    env = os.environ.get("NEKO_TRANSLATE_LOG")
+    env = os.environ.get("BEKO_TRANSLATE_LOG")
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_LOG_NAME
@@ -547,7 +547,7 @@ def resolve_log_path(value: str | None) -> Path:
 def resolve_state_path(value: str | None) -> Path:
     if value:
         return Path(value).expanduser()
-    env = os.environ.get("NEKO_TRANSLATE_STATE")
+    env = os.environ.get("BEKO_TRANSLATE_STATE")
     if env:
         return Path(env).expanduser()
     return DEFAULT_CONFIG_DIR / DEFAULT_STATE_NAME
@@ -1039,7 +1039,7 @@ def _start_server(
     cmd = [
         sys.executable,
         "-m",
-        "neko_translate.cli",
+        "beko_translate.cli",
         "server",
         "run",
         "--model",
