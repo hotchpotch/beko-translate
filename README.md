@@ -13,7 +13,7 @@ PDF の見開き翻訳コマンドも同梱されており、たとえば論文�
 - サーバーモードで常駐可能・起動コストを削減
 - 対話モード翻訳
 - ストリーミング出力 (対話モードはデフォルト ON )
-- PDF 翻訳 (見開き翻訳対応)
+- レイアウトを維持した PDF 翻訳 (見開き翻訳対応)
 
 ## インストール
 
@@ -134,10 +134,16 @@ uv run neko-translate-pdf paper.pdf \
 
 なお、PDF 翻訳には時間がかかります。`mlx-community/plamo-2-translate` を使って、論文を翻訳する場合、ページ数にもよりますが M4 Max で5分〜20分ほどかかります。
 
+### 自動でダウンロードフォルダの pdf を翻訳
+
+[scripts/auto_pdf_translate.py](scripts/auto_pdf_translate.py) に、ブラウザのダウンロードフォルダの pdf で未翻訳のものがあれば、自動で翻訳するスクリプトがあります。
+
+このコマンドに、`auto_pdf_translate.py --arxiv` と `--arxiv` オプションをつけると、arxiv の PDF のようなファイル名だけを翻訳します。そのため、ブラウザで論文をダウンロード、コマンド一発で複数の論文を自動翻訳、のような用途で便利に活用できます。なお、このコマンドの標準の利用モデルは `plamo` となるので、plamo のライセンスが適用されます。
+
 
 ## 翻訳モデルの選択
 
-何も指定しない場合、デフォルトは小型高速な以下のモデルです。
+何も指定しない場合、デフォルトは小型高速な以下の[CAT-Translate](https://huggingface.co/collections/cyberagent/cat-translate)モデルです。
 
 - `hotchpotch/CAT-Translate-0.8b-mlx-q4`
 
