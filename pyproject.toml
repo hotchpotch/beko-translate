@@ -33,6 +33,7 @@ dependencies = [
     "mlx-lm>=0.29.1",
     "numba>=0.63.1",
     "pypdf>=6.6.2",
+    "torch>=2",
 ]
 
 [project.urls]
