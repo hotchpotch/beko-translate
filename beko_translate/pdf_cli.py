@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Literal, Optional, Tuple
 
 from . import cli as beko_cli
 from .translation_models import resolve_model_alias
@@ -334,7 +334,9 @@ def cleanup_extras(
             sys.stderr.write(f"Warning: failed to remove {path}: {exc}\n")
 
 
-def pick_output_file(paths: Iterable[Path], stem: str) -> Optional[Path]:
+def pick_output_file(
+    paths: Iterable[Path], stem: str, dual_or_mono: Literal["dual", "mono"]
+) -> Optional[Path]:
     pdfs = [p for p in paths if p.suffix.lower() == ".pdf"]
     if not pdfs:
         return None
@@ -343,7 +345,7 @@ def pick_output_file(paths: Iterable[Path], stem: str) -> Optional[Path]:
         name = p.name
         return (
             0 if "no_watermark" in name else 1,
-            0 if "dual" in name else 1,
+            0 if dual_or_mono in name else 1,
             0 if stem in name else 1,
             -p.stat().st_mtime,
         )
@@ -359,6 +361,7 @@ def translate_pdf(
     base_prefix: str,
     base_clean: str,
     pdf2zh_args: list[str],
+    dual_or_mono: Literal["dual", "mono"],
 ) -> bool:
     cmd = (
         shlex.split(PDF2ZH_COMMAND)
@@ -374,7 +377,7 @@ def translate_pdf(
         )
         return False
 
-    output_file = pick_output_file(output_dir.glob("*.pdf"), pdf_path.stem)
+    output_file = pick_output_file(output_dir.glob("*.pdf"), pdf_path.stem, dual_or_mono)
     if output_file is None:
         sys.stderr.write(
             f"Translated output for {pdf_path.name} not found in {output_dir}.\n"
@@ -707,6 +710,7 @@ def main() -> int:
                 base_raw,
                 base_clean,
                 pdf2zh_args,
+                "mono" if args.no_dual else "dual",
             )
             if success:
                 print(f"[done] {dest}")
