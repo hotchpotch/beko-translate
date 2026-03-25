@@ -1,6 +1,6 @@
 [project]
 name = "beko-translate"
-version = "0.0.3"
+version = "0.0.4"
 description = "MLX-based translation CLI with PDF translation support."
 license = { text = "MIT" }
 readme = "README.md"

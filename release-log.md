@@ -4,6 +4,11 @@
 
 - (unreleased)
 
+## 0.0.4
+
+- `beko-translate-pdf --no-dual` 時に `*mono*.pdf` を優先して選ぶよう修正。
+- `--no-dual` と通常の `dual` 出力選択を固定する回帰テストを追加。
+
 ## 0.0.3
 
 - `torch>=2` を依存関係に追加し、`--model plamo` 初回実行時の `torch` 未導入警告を回避。
